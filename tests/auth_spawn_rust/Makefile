@@ -1,7 +1,6 @@
 CKB_DEBUGGER ?= ckb-debugger
 
 all: \
-	install \
 	auth-spawn-success
 
 auth-spawn-success:
@@ -9,5 +8,5 @@ auth-spawn-success:
 	${CKB_DEBUGGER} --tx-file=tx.json -s lock
 
 install:
-	cargo install --locked --rev 02f4656 --git https://github.com/nervosnetwork/ckb-standalone-debugger ckb-debugger
+	cargo install --locked --rev 5077c6c4 --git https://github.com/nervosnetwork/ckb-standalone-debugger ckb-debugger
 
