@@ -147,7 +147,7 @@ The first argument denotes the `algorithm_id` in `CkbAuthType` described above. 
 A valid dynamic library denoted by `EntryType` should provide `ckb_auth_validate` exported function.
 
 ### Entry Category: Exec (Deprecated)
-It's deprecated, See [Deprecated Exec](#heading).
+It's deprecated, See [Deprecated Exec](#deprecated-exec).
 
 This category shares same arguments and behavior to dynamic library. It uses `exec` instead of `dynamic library`. When
 entry category is `exec`, it follows the rules described in [Ideas on chained
