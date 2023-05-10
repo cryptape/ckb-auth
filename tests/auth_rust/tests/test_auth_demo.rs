@@ -492,7 +492,7 @@ fn convert_lite_error() {
     struct LiteConverFaileAuth(LitecoinAuth);
     impl Auth for LiteConverFaileAuth {
         fn get_pub_key_hash(&self) -> Vec<u8> {
-            BitcoinAuth::get_btc_pub_key_hash(&self.0.privkey, self.0.compress)
+            BitcoinAuth::get_btc_pub_key_hash(&self.0.get_privkey(), self.0.compress)
         }
         fn get_algorithm_type(&self) -> u8 {
             AlgorithmType::Bitcoin as u8
@@ -512,16 +512,13 @@ fn convert_lite_error() {
             H256::from(msg)
         }
         fn sign(&self, msg: &H256) -> Bytes {
-            BitcoinAuth::btc_sign(msg, &self.0.privkey, self.0.compress)
+            BitcoinAuth::btc_sign(msg, &self.0.get_privkey(), self.0.compress)
         }
     }
 
-    let privkey = Generator::random_privkey();
+    let sk = Generator::random_secret_key().secret_bytes();
     let auth: Box<dyn Auth> = Box::new(LiteConverFaileAuth {
-        0: LitecoinAuth {
-            privkey,
-            compress: true,
-        },
+        0: LitecoinAuth { sk, compress: true },
     });
 
     let config = TestConfig::new(&auth, EntryCategoryType::DynamicLinking, 1);

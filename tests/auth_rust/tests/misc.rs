@@ -907,21 +907,25 @@ impl Auth for DogecoinAuth {
 
 #[derive(Clone)]
 pub struct LitecoinAuth {
-    pub privkey: Privkey,
+    // Use raw [u8; 32] to easily convert this into Privkey and SecretKey
+    pub sk: [u8; 32],
     pub compress: bool,
 }
 impl LitecoinAuth {
     pub fn new() -> Box<LitecoinAuth> {
-        let privkey = Generator::random_privkey();
+        let sk: [u8; 32] = Generator::random_secret_key().secret_bytes();
         Box::new(LitecoinAuth {
-            privkey,
+            sk,
             compress: true,
         })
+    }
+    pub fn get_privkey(&self) -> Privkey {
+        Privkey::from_slice(&self.sk)
     }
 }
 impl Auth for LitecoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
-        BitcoinAuth::get_btc_pub_key_hash(&self.privkey, self.compress)
+        BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
     }
     fn get_algorithm_type(&self) -> u8 {
         AlgorithmType::Litecoin as u8
@@ -941,13 +945,13 @@ impl Auth for LitecoinAuth {
         H256::from(msg)
     }
     fn sign(&self, msg: &H256) -> Bytes {
-        BitcoinAuth::btc_sign(msg, &self.privkey, self.compress)
+        BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress)
     }
     fn get_pub_key_hash_official(&self) -> Vec<u8> {
-        BitcoinAuth::get_btc_pub_key_hash(&self.privkey, self.compress)
+        BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
     }
     fn sign_official(&self, msg: &H256) -> Bytes {
-        BitcoinAuth::btc_sign(msg, &self.privkey, self.compress)
+        BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress)
     }
 }
 
