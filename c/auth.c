@@ -461,6 +461,15 @@ int convert_doge_message(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
                                        DOGE_MESSAGE_MAGIC, DOGE_MAGIC_LEN);
 }
 
+const char LITE_MESSAGE_MAGIC[26] = "Litecoin Signed Message:\n";
+const int8_t LITE_MAGIC_LEN = 25;
+
+int convert_litecoin_message(const uint8_t *msg, size_t msg_len,
+                             uint8_t *new_msg, size_t new_msg_len) {
+    return convert_btc_message_variant(msg, msg_len, new_msg, new_msg_len,
+                                       LITE_MESSAGE_MAGIC, LITE_MAGIC_LEN);
+}
+
 bool is_lock_script_hash_present(uint8_t *lock_script_hash) {
     int err = 0;
     size_t i = 0;
@@ -701,6 +710,11 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
         err =
             verify(pubkey_hash, signature, signature_size, message,
                    message_size, validate_signature_btc, convert_doge_message);
+        CHECK(err);
+    } else if (auth_algorithm_id == AuthAlgorithmIdLitecoin) {
+        err = verify(pubkey_hash, signature, signature_size, message,
+                     message_size, validate_signature_btc,
+                     convert_litecoin_message);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdCkbMultisig) {
         err = verify_multisig(signature, signature_size, message, pubkey_hash);

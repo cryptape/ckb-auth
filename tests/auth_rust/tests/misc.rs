@@ -358,6 +358,7 @@ pub enum AlgorithmType {
     SchnorrOrTaproot = 7,
     RSA = 8,
     Iso9796_2 = 9,
+    Litecoin = 10,
     OwnerLock = 0xFC,
 }
 
@@ -594,6 +595,9 @@ pub fn auth_builder(t: AlgorithmType) -> result::Result<Box<dyn Auth>, i32> {
             return Ok(RSAAuth::new());
         }
         AlgorithmType::Iso9796_2 => {}
+        AlgorithmType::Litecoin => {
+            return Ok(LitecoinAuth::new());
+        }
         AlgorithmType::OwnerLock => {
             return Ok(OwnerLockAuth::new());
         }
@@ -856,6 +860,46 @@ impl Auth for DogecoinAuth {
     }
     fn convert_message(&self, message: &[u8; 32]) -> H256 {
         let message_magic = b"\x19Dogecoin Signed Message:\n\x40";
+        let msg_hex = hex::encode(message);
+        assert_eq!(msg_hex.len(), 64);
+
+        let mut temp2: BytesMut = BytesMut::with_capacity(message_magic.len() + msg_hex.len());
+        temp2.put(Bytes::from(message_magic.to_vec()));
+        temp2.put(Bytes::from(hex::encode(message)));
+
+        let msg = calculate_sha256(&temp2);
+        let msg = calculate_sha256(&msg);
+
+        H256::from(msg)
+    }
+    fn sign(&self, msg: &H256) -> Bytes {
+        BitcoinAuth::btc_sign(msg, &self.privkey, self.compress)
+    }
+}
+
+#[derive(Clone)]
+pub struct LitecoinAuth {
+    pub privkey: Privkey,
+    pub compress: bool,
+}
+impl LitecoinAuth {
+    pub fn new() -> Box<LitecoinAuth> {
+        let privkey = Generator::random_privkey();
+        Box::new(LitecoinAuth {
+            privkey,
+            compress: true,
+        })
+    }
+}
+impl Auth for LitecoinAuth {
+    fn get_pub_key_hash(&self) -> Vec<u8> {
+        BitcoinAuth::get_btc_pub_key_hash(&self.privkey, self.compress)
+    }
+    fn get_algorithm_type(&self) -> u8 {
+        AlgorithmType::Litecoin as u8
+    }
+    fn convert_message(&self, message: &[u8; 32]) -> H256 {
+        let message_magic = b"\x19Litecoin Signed Message:\n\x40";
         let msg_hex = hex::encode(message);
         assert_eq!(msg_hex.len(), 64);
 

@@ -16,7 +16,7 @@ use misc::{
     assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
     gen_tx_with_grouped_args, sign_tx, AlgorithmType, Auth, AuthErrorCodeType, BitcoinAuth,
     CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader, EntryCategoryType, EosAuth,
-    EthereumAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
+    EthereumAuth, LitecoinAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
 };
 mod misc;
 
@@ -270,6 +270,11 @@ fn dogecoin_verify() {
 }
 
 #[test]
+fn litecoin_verify() {
+    unit_test_common(AlgorithmType::Litecoin);
+}
+
+#[test]
 fn convert_eth_error() {
     #[derive(Clone)]
     struct EthConverFaileAuth(EthereumAuth);
@@ -481,6 +486,52 @@ fn convert_doge_error() {
     );
 }
 
+#[test]
+fn convert_lite_error() {
+    #[derive(Clone)]
+    struct LiteConverFaileAuth(LitecoinAuth);
+    impl Auth for LiteConverFaileAuth {
+        fn get_pub_key_hash(&self) -> Vec<u8> {
+            BitcoinAuth::get_btc_pub_key_hash(&self.0.privkey, self.0.compress)
+        }
+        fn get_algorithm_type(&self) -> u8 {
+            AlgorithmType::Bitcoin as u8
+        }
+        fn convert_message(&self, message: &[u8; 32]) -> H256 {
+            let message_magic = b"\x18Bitcoin Signed Xessage:\n\x40";
+            let msg_hex = hex::encode(message);
+            assert_eq!(msg_hex.len(), 64);
+
+            let mut temp2: BytesMut = BytesMut::with_capacity(message_magic.len() + msg_hex.len());
+            temp2.put(Bytes::from(message_magic.to_vec()));
+            temp2.put(Bytes::from(hex::encode(message)));
+
+            let msg = misc::calculate_sha256(&temp2);
+            let msg = misc::calculate_sha256(&msg);
+
+            H256::from(msg)
+        }
+        fn sign(&self, msg: &H256) -> Bytes {
+            BitcoinAuth::btc_sign(msg, &self.0.privkey, self.0.compress)
+        }
+    }
+
+    let privkey = Generator::random_privkey();
+    let auth: Box<dyn Auth> = Box::new(LiteConverFaileAuth {
+        0: LitecoinAuth {
+            privkey,
+            compress: true,
+        },
+    });
+
+    let config = TestConfig::new(&auth, EntryCategoryType::DynamicLinking, 1);
+    assert_result_error(
+        verify_unit(&config),
+        "failed conver lite",
+        &[AuthErrorCodeType::Mismatched as i32],
+    );
+}
+
 #[derive(Clone)]
 pub struct CkbMultisigFailedAuth(CkbMultisigAuth);
 impl Auth for CkbMultisigFailedAuth {
@@ -604,7 +655,6 @@ fn ckbmultisig_verify_sing_size_failed() {}
 fn schnorr_verify() {
     unit_test_common(AlgorithmType::SchnorrOrTaproot);
 }
-
 
 #[test]
 fn abnormal_algorithm_type() {
