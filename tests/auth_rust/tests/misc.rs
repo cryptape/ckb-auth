@@ -379,6 +379,8 @@ pub struct TestConfig {
     pub incorrect_msg: bool,
     pub incorrect_sign: bool,
     pub incorrect_sign_size: TestConfigIncorrectSing,
+    // whether to use official tools to sign messages
+    pub official: bool,
 }
 
 impl TestConfig {
@@ -396,6 +398,26 @@ impl TestConfig {
             incorrect_msg: false,
             incorrect_sign: false,
             incorrect_sign_size: TestConfigIncorrectSing::None,
+            official: false,
+        }
+    }
+
+    pub fn new_official(
+        auth: &Box<dyn Auth>,
+        entry_category_type: EntryCategoryType,
+        sign_size: i32,
+        official: bool
+    ) -> TestConfig {
+        assert!(sign_size > 0);
+        TestConfig {
+            auth: auth.clone(),
+            entry_category_type,
+            sign_size,
+            incorrect_pubkey: false,
+            incorrect_msg: false,
+            incorrect_sign: false,
+            incorrect_sign_size: TestConfigIncorrectSing::None,
+            official: true
         }
     }
 }
@@ -564,6 +586,12 @@ pub trait Auth: DynClone {
     }
     fn get_sign_size(&self) -> usize {
         SIGNATURE_SIZE
+    }
+    fn get_pub_key_hash_official(&self) -> Vec<u8> {
+        unreachable!("Official get_pub_ke_hash not implemented");
+    }
+    fn sign_official(&self, _msg: &H256) -> Bytes {
+        unreachable!("Official sign implemented");
     }
 }
 
@@ -913,6 +941,12 @@ impl Auth for LitecoinAuth {
         H256::from(msg)
     }
     fn sign(&self, msg: &H256) -> Bytes {
+        BitcoinAuth::btc_sign(msg, &self.privkey, self.compress)
+    }
+    fn get_pub_key_hash_official(&self) -> Vec<u8> {
+        BitcoinAuth::get_btc_pub_key_hash(&self.privkey, self.compress)
+    }
+    fn sign_official(&self, msg: &H256) -> Bytes {
         BitcoinAuth::btc_sign(msg, &self.privkey, self.compress)
     }
 }
