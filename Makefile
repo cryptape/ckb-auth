@@ -31,7 +31,7 @@ build/secp256k1_data_info_20210801.h: build/dump_secp256k1_data_20210801
 
 build/dump_secp256k1_data_20210801: c/dump_secp256k1_data_20210801.c $(SECP256K1_SRC_20210801)
 	mkdir -p build
-	gcc -I deps/secp256k1-20210801/src -I deps/secp256k1-20210801 -o $@ $<
+	gcc -I deps/ckb-c-stdlib-2023 -I deps/secp256k1-20210801/src -I deps/secp256k1-20210801 -o $@ $<
 
 $(SECP256K1_SRC_20210801):
 	cd deps/secp256k1-20210801 && \
