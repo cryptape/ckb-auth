@@ -12,7 +12,6 @@ make all-via-docker
 
 ## Test
 
-```
-
-
+```bash
+cd tests/auth_rust && bash run.sh
 ```
