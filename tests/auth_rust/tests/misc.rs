@@ -406,7 +406,7 @@ impl TestConfig {
         auth: &Box<dyn Auth>,
         entry_category_type: EntryCategoryType,
         sign_size: i32,
-        official: bool
+        official: bool,
     ) -> TestConfig {
         assert!(sign_size > 0);
         TestConfig {
@@ -417,7 +417,7 @@ impl TestConfig {
             incorrect_msg: false,
             incorrect_sign: false,
             incorrect_sign_size: TestConfigIncorrectSing::None,
-            official: true
+            official: true,
         }
     }
 }
@@ -910,6 +910,7 @@ pub struct LitecoinAuth {
     // Use raw [u8; 32] to easily convert this into Privkey and SecretKey
     pub sk: [u8; 32],
     pub compress: bool,
+    pub network: bitcoin::Network,
 }
 impl LitecoinAuth {
     pub fn new() -> Box<LitecoinAuth> {
@@ -917,14 +918,20 @@ impl LitecoinAuth {
         Box::new(LitecoinAuth {
             sk,
             compress: true,
+            network: bitcoin::Network::Testnet,
         })
     }
     pub fn get_privkey(&self) -> Privkey {
         Privkey::from_slice(&self.sk)
     }
+    pub fn get_btc_private_key(&self) -> bitcoin::PrivateKey {
+        let sk = bitcoin::secp256k1::SecretKey::from_slice(&self.sk).unwrap();
+        bitcoin::PrivateKey::new(sk, self.network)
+    }
 }
 impl Auth for LitecoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
+        dbg!(self.get_btc_private_key().to_wif());
         BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
     }
     fn get_algorithm_type(&self) -> u8 {
@@ -942,6 +949,24 @@ impl Auth for LitecoinAuth {
         let msg = calculate_sha256(&temp2);
         let msg = calculate_sha256(&msg);
 
+        let wif = "cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4";
+        let key_bytes = bitcoin::PrivateKey::from_wif(wif).unwrap().to_bytes();
+        let signature = Privkey::from_slice(&key_bytes)
+            .sign_recoverable(&H256::from(msg))
+            .expect("sign")
+            .serialize();
+
+        use base64::{engine::general_purpose, Engine as _};
+        dbg!(
+            message,
+            temp2,
+            msg,
+            wif,
+            &key_bytes,
+            general_purpose::STANDARD.encode(&signature),
+            &signature
+        );
+
         H256::from(msg)
     }
     fn sign(&self, msg: &H256) -> Bytes {
@@ -951,6 +976,13 @@ impl Auth for LitecoinAuth {
         BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
     }
     fn sign_official(&self, msg: &H256) -> Bytes {
+        // rm -rf ~/.litecoin
+        // litecoind -testnet -whitelist=1.1.1.1/32
+        // litecoin-cli -testnet createwallet ckb-auth-test-wallet
+        // litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet importprivkey cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4 ckb-auth-test-privkey false
+        // export ADDRESS="$(litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet getnewaddress ckb-auth-test-privkey legacy)" MESSAGE="my message"
+        // SIGNATURE="$(litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet signmessage "$ADDRESS" "$MESSAGE")"
+        // litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet verifymessage "$ADDRESS" "$SIGNATURE" "$MESSAGE"
         BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress)
     }
 }

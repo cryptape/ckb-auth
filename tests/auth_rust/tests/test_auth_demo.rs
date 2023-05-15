@@ -271,6 +271,59 @@ fn dogecoin_verify() {
 
 #[test]
 fn litecoin_verify() {
+    let wif = "cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4";
+    let key = bitcoin::PrivateKey::from_wif(wif).unwrap();
+    dbg!(wif, key, key.to_wif());
+    let secp = bitcoin::secp256k1::Secp256k1::new();
+    let message = b"my message";
+    let address = "n3Kioc9DeQPGAHx7gccycZ5SQp9pKEt7KH";
+    let signature =
+        "Hxx9sfEkZIIVtmfv0L5zNW09RvxrcQlImYoJbfsY2fFbAGwFXWLw2eQstrBgFwsnBWCJ/AkFGUV6XK8ILTQv4/8=";
+
+    use base64::{engine::general_purpose, Engine as _};
+    dbg!(message, address, signature);
+    let sig = general_purpose::STANDARD.decode(signature).unwrap();
+    dbg!(sig);
+
+    let privkey = Privkey::from_slice(&key.to_bytes());
+
+    let message_magic = b"\x18Bitcoin Signed Message:\n\x40";
+    let msg_hex = hex::encode(message);
+    dbg!(&msg_hex);
+
+    let mut temp2: BytesMut = BytesMut::with_capacity(message_magic.len() + msg_hex.len());
+    temp2.put(Bytes::from(message_magic.to_vec()));
+    temp2.put(Bytes::from(hex::encode(message)));
+    dbg!(&temp2);
+
+    let msg = misc::calculate_sha256(&temp2);
+    let msg = misc::calculate_sha256(&msg);
+
+    let converted = H256::from(msg);
+
+    let signature = privkey.sign_recoverable(&converted).expect("sign");
+    dbg!(
+        &message,
+        &converted,
+        &signature.serialize(),
+        general_purpose::STANDARD.encode(&signature.serialize())
+    );
+    let (recid, compact) = signature
+        .to_recoverable()
+        .expect("to_recoverable")
+        .serialize_compact();
+    let signature =
+        bitcoin::secp256k1::ecdsa::Signature::from_compact(&compact).expect("from_compact");
+    let message = bitcoin::secp256k1::Message::from_slice(&converted.0).expect("from_slice");
+
+    assert!(secp
+        .verify_ecdsa(
+            &message,
+            &signature,
+            &bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &key.inner)
+        )
+        .is_ok());
+
     unit_test_common(AlgorithmType::Litecoin);
 }
 
@@ -518,7 +571,11 @@ fn convert_lite_error() {
 
     let sk = Generator::random_secret_key().secret_bytes();
     let auth: Box<dyn Auth> = Box::new(LiteConverFaileAuth {
-        0: LitecoinAuth { sk, compress: true },
+        0: LitecoinAuth {
+            sk,
+            compress: true,
+            network: bitcoin::Network::Testnet,
+        },
     });
 
     let config = TestConfig::new(&auth, EntryCategoryType::DynamicLinking, 1);
