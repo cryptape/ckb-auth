@@ -843,6 +843,25 @@ impl BitcoinAuth {
         H256::from(msg)
     }
     pub fn btc_sign(msg: &H256, privkey: &Privkey, compress: bool) -> Bytes {
+        unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+            ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
+        }
+        let privkey_bytes: &[u8] = unsafe { any_as_u8_slice(privkey) };
+        let privkey_bytes = privkey_bytes.clone();
+
+        let sk = bitcoin::secp256k1::SecretKey::from_slice(&privkey_bytes).unwrap();
+        let bpk = bitcoin::PrivateKey::new(sk, bitcoin::Network::Testnet);
+
+        let pubkey = privkey.pubkey().unwrap();
+        use base64::{engine::general_purpose, Engine as _};
+        dbg!(
+            hex::encode(pubkey.serialize()),
+            bpk.to_wif(),
+            hex::encode(privkey_bytes),
+            hex::encode(bpk.to_bytes()),
+            general_purpose::STANDARD.encode(bpk.to_bytes())
+        );
+
         let sign = privkey.sign_recoverable(&msg).expect("sign").serialize();
         assert_eq!(sign.len(), 65);
         let recid = sign[64];
@@ -925,7 +944,21 @@ pub struct LitecoinAuth {
 }
 impl LitecoinAuth {
     pub fn new() -> Box<LitecoinAuth> {
-        let sk: [u8; 32] = Generator::random_secret_key().secret_bytes();
+        // Key information
+        // cSoKeLipWLXgdonv3pxE7XBp37yPVAnFcio3ZfGvsdjSWZa67cFJ 1970-01-01T00:00:01Z label=ckb-auth-test-privkey # addr=msv9GiUuCGEaoWzu7YcPDJo8hu5ij3Nzjn,Qe2ByfdQjU5AUZTvZ4XCrmQxHQctBXavWL,tltc1q3qzr64hqq7wnpyn7h79mny6c6lw667kcjva8fn,tmweb1qqd5lvzw07su0msnsmfuuety4pmcqkkm7audj6mlwsjf9flafm2p3xq7pl6cyylpjzw9q4js4t64upy4nfreqwy9mgj4zg5xd3dxsml4y7qr7705e
+        let mut generator = Generator::non_crypto_safe_prng(42);
+        let privkey = generator.gen_privkey();
+
+        unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
+            ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
+        }
+        let privkey_bytes: &[u8] = unsafe { any_as_u8_slice(&privkey) };
+
+        let sk = bitcoin::secp256k1::SecretKey::from_slice(privkey_bytes).unwrap();
+        let sk = sk.secret_bytes();
+
+        dbg!(hex::encode(&sk));
+
         Box::new(LitecoinAuth {
             sk,
             compress: true,
@@ -958,31 +991,6 @@ impl Auth for LitecoinAuth {
 
         let msg = calculate_sha256(&temp2);
         let msg = calculate_sha256(&msg);
-
-        let wif = "cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4";
-        let private_key_bytes = bitcoin::PrivateKey::from_wif(wif).unwrap().to_bytes();
-        let signature = Privkey::from_slice(&private_key_bytes)
-            .sign_recoverable(&H256::from(msg))
-            .expect("sign");
-
-        use base64::{engine::general_purpose, Engine as _};
-        let message_before_convert = hex::encode(message);
-        let converted_message = temp2;
-        let hashed_message = hex::encode(msg);
-        let private_key_hex = hex::encode(private_key_bytes);
-        let signature_bytes = signature.serialize();
-        let signature_hex = hex::encode(&signature_bytes);
-        let signature_base64 = general_purpose::STANDARD.encode(&signature_bytes);
-        dbg!(
-            message_before_convert,
-            converted_message,
-            hashed_message,
-            wif,
-            private_key_hex,
-            signature_hex,
-            signature_base64,
-            &signature
-        );
 
         H256::from(msg)
     }
@@ -1275,3 +1283,5 @@ impl Auth for OwnerLockAuth {
         Bytes::from([0; 64].to_vec())
     }
 }
+
+
