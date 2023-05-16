@@ -271,60 +271,79 @@ fn dogecoin_verify() {
 
 #[test]
 fn litecoin_verify() {
-    let wif = "cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4";
-    let key = bitcoin::PrivateKey::from_wif(wif).unwrap();
-    dbg!(wif, key, key.to_wif());
-    let secp = bitcoin::secp256k1::Secp256k1::new();
-    let message = b"my message";
-    let address = "n3Kioc9DeQPGAHx7gccycZ5SQp9pKEt7KH";
-    let signature =
-        "Hxx9sfEkZIIVtmfv0L5zNW09RvxrcQlImYoJbfsY2fFbAGwFXWLw2eQstrBgFwsnBWCJ/AkFGUV6XK8ILTQv4/8=";
+    unit_test_common(AlgorithmType::Litecoin);
+}
 
-    use base64::{engine::general_purpose, Engine as _};
-    dbg!(message, address, signature);
-    let sig = general_purpose::STANDARD.decode(signature).unwrap();
-    dbg!(sig);
+#[test]
+fn my_litecoin_verify() {
+    let auth: Box<dyn Auth> = LitecoinAuth::new();
+    unit_test_success(&auth, EntryCategoryType::Exec);
+}
 
-    let privkey = Privkey::from_slice(&key.to_bytes());
-
-    let message_magic = b"\x18Bitcoin Signed Message:\n\x40";
-    let msg_hex = hex::encode(message);
-    dbg!(&msg_hex);
+#[test]
+fn my_litecoin_convert_message() {
+    let message_magic = b"\x19Litecoin Signed Message:\n\x40";
+    let msg_hex = "67632a3969a93df3da57c4006509d4505f2b2ea4ad07a3f9f0b8e34d32edfa62".to_string();
+    assert_eq!(msg_hex.len(), 64);
 
     let mut temp2: BytesMut = BytesMut::with_capacity(message_magic.len() + msg_hex.len());
     temp2.put(Bytes::from(message_magic.to_vec()));
-    temp2.put(Bytes::from(hex::encode(message)));
-    dbg!(&temp2);
+    temp2.put(Bytes::from(msg_hex.clone()));
 
     let msg = misc::calculate_sha256(&temp2);
     let msg = misc::calculate_sha256(&msg);
 
-    let converted = H256::from(msg);
+    dbg!(&msg_hex, hex::encode(&msg));
 
-    let signature = privkey.sign_recoverable(&converted).expect("sign");
+    let wif = "cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4";
+    let private_key = bitcoin::PrivateKey::from_wif(wif).unwrap();
+    let private_key_bytes = private_key.to_bytes();
+    let signature = Privkey::from_slice(&private_key_bytes)
+        .sign_recoverable(&H256::from(msg))
+        .expect("sign");
+
+    use base64::{engine::general_purpose, Engine as _};
+    let message_before_convert = &msg_hex;
+    let converted_message = temp2;
+    let hashed_message = hex::encode(msg);
+    let private_key_hex = hex::encode(private_key_bytes);
+    let signature_bytes = signature.serialize();
+    let signature_hex = hex::encode(&signature_bytes);
+    let signature_base64 = general_purpose::STANDARD.encode(&signature_bytes);
     dbg!(
-        &message,
-        &converted,
-        &signature.serialize(),
-        general_purpose::STANDARD.encode(&signature.serialize())
+        message_before_convert,
+        converted_message,
+        hashed_message,
+        wif,
+        private_key_hex,
+        signature_hex,
+        signature_base64,
+        &signature
     );
-    let (recid, compact) = signature
-        .to_recoverable()
-        .expect("to_recoverable")
-        .serialize_compact();
-    let signature =
-        bitcoin::secp256k1::ecdsa::Signature::from_compact(&compact).expect("from_compact");
-    let message = bitcoin::secp256k1::Message::from_slice(&converted.0).expect("from_slice");
 
-    assert!(secp
-        .verify_ecdsa(
-            &message,
-            &signature,
-            &bitcoin::secp256k1::PublicKey::from_secret_key(&secp, &key.inner)
-        )
-        .is_ok());
-
-    unit_test_common(AlgorithmType::Litecoin);
+    let signature = ckb_crypto::secp::Signature::from_slice(&signature_bytes).unwrap();
+    let pk = signature.recover(&msg.into()).unwrap();
+    dbg!(&pk);
+    let sign = signature.serialize();
+    assert_eq!(sign.len(), 65);
+    let recid = sign[64];
+    let mut signature = BytesMut::with_capacity(65);
+    let mut compressed_signature = BytesMut::with_capacity(65);
+    signature.put_u8(recid + 27);
+    signature.put(&sign[0..64]);
+    // We are only able to verifymessage with the official litecoin client by passing the
+    // compressed form of the signature. e.g.
+    // litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet verifymessage mhknqLHQGWDXuLsPdzab8nA4jD3fMdVYS2 H0GZy3roAWBrJesyeGx+rSAwE+UnEiDcrHuDVi206p0dFtTZ+rXARo10Ju8lv+ndEDxL9C9e2iHX3/7VNXtnT/k= 67632a3969a93df3da57c4006509d4505f2b2ea4ad07a3f9f0b8e34d32edfa62
+    // https://github.com/bitcoin/bitcoin/blob/3ff67f77831474e342502e6a24be8a2ce5688e04/src/pubkey.cpp#L276-L294
+    compressed_signature.put_u8(recid + 31);
+    compressed_signature.put(&sign[0..64]);
+    dbg!(
+        recid,
+        hex::encode(&signature),
+        general_purpose::STANDARD.encode(&signature),
+        hex::encode(&compressed_signature),
+        general_purpose::STANDARD.encode(&compressed_signature)
+    );
 }
 
 #[test]
