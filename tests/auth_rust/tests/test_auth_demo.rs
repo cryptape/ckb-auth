@@ -162,14 +162,25 @@ fn unit_test_common_with_auth(auth: &Box<dyn Auth>, run_type: EntryCategoryType)
     unit_test_faileds(auth, run_type);
 }
 
-fn unit_test_common_with_runtype(algorithm_type: AlgorithmType, run_type: EntryCategoryType) {
-    let auth = auth_builder(algorithm_type).unwrap();
+fn unit_test_common_with_runtype(
+    algorithm_type: AlgorithmType,
+    run_type: EntryCategoryType,
+    using_official_client: bool,
+) {
+    let auth = auth_builder(algorithm_type, using_official_client).unwrap();
     unit_test_common_with_auth(&auth, run_type);
 }
 
 fn unit_test_common(algorithm_type: AlgorithmType) {
-    unit_test_common_with_runtype(algorithm_type, EntryCategoryType::DynamicLinking);
-    unit_test_common_with_runtype(algorithm_type, EntryCategoryType::Exec);
+    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Exec] {
+        unit_test_common_with_runtype(algorithm_type, t, false);
+    }
+}
+
+fn unit_test_common_official(algorithm_type: AlgorithmType) {
+    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Exec] {
+        unit_test_common_with_runtype(algorithm_type, t, true);
+    }
 }
 
 #[test]
@@ -275,77 +286,8 @@ fn litecoin_verify() {
 }
 
 #[test]
-fn my_litecoin_verify() {
-    let auth: Box<dyn Auth> = LitecoinAuth::new();
-    let run_type = EntryCategoryType::Exec;
-    let config = TestConfig::new(&auth, run_type, 1);
-    assert!(verify_unit(&config).is_ok());
-}
-
-#[test]
-fn my_litecoin_convert_message() {
-    let message_magic = b"\x19Litecoin Signed Message:\n\x40";
-    let msg_hex = "67632a3969a93df3da57c4006509d4505f2b2ea4ad07a3f9f0b8e34d32edfa62".to_string();
-    assert_eq!(msg_hex.len(), 64);
-
-    let mut temp2: BytesMut = BytesMut::with_capacity(message_magic.len() + msg_hex.len());
-    temp2.put(Bytes::from(message_magic.to_vec()));
-    temp2.put(Bytes::from(msg_hex.clone()));
-
-    let msg = misc::calculate_sha256(&temp2);
-    let msg = misc::calculate_sha256(&msg);
-
-    dbg!(&msg_hex, hex::encode(&msg));
-
-    let wif = "cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4";
-    let private_key = bitcoin::PrivateKey::from_wif(wif).unwrap();
-    let private_key_bytes = private_key.to_bytes();
-    let signature = Privkey::from_slice(&private_key_bytes)
-        .sign_recoverable(&H256::from(msg))
-        .expect("sign");
-
-    use base64::{engine::general_purpose, Engine as _};
-    let message_before_convert = &msg_hex;
-    let converted_message = temp2;
-    let hashed_message = hex::encode(msg);
-    let private_key_hex = hex::encode(private_key_bytes);
-    let signature_bytes = signature.serialize();
-    let signature_hex = hex::encode(&signature_bytes);
-    let signature_base64 = general_purpose::STANDARD.encode(&signature_bytes);
-    dbg!(
-        message_before_convert,
-        converted_message,
-        hashed_message,
-        wif,
-        private_key_hex,
-        signature_hex,
-        signature_base64,
-        &signature
-    );
-
-    let signature = ckb_crypto::secp::Signature::from_slice(&signature_bytes).unwrap();
-    let pk = signature.recover(&msg.into()).unwrap();
-    dbg!(&pk);
-    let sign = signature.serialize();
-    assert_eq!(sign.len(), 65);
-    let recid = sign[64];
-    let mut signature = BytesMut::with_capacity(65);
-    let mut compressed_signature = BytesMut::with_capacity(65);
-    signature.put_u8(recid + 27);
-    signature.put(&sign[0..64]);
-    // We are only able to verifymessage with the official litecoin client by passing the
-    // compressed form of the signature. e.g.
-    // litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet verifymessage mhknqLHQGWDXuLsPdzab8nA4jD3fMdVYS2 H0GZy3roAWBrJesyeGx+rSAwE+UnEiDcrHuDVi206p0dFtTZ+rXARo10Ju8lv+ndEDxL9C9e2iHX3/7VNXtnT/k= 67632a3969a93df3da57c4006509d4505f2b2ea4ad07a3f9f0b8e34d32edfa62
-    // https://github.com/bitcoin/bitcoin/blob/3ff67f77831474e342502e6a24be8a2ce5688e04/src/pubkey.cpp#L276-L294
-    compressed_signature.put_u8(recid + 31);
-    compressed_signature.put(&sign[0..64]);
-    dbg!(
-        recid,
-        hex::encode(&signature),
-        general_purpose::STANDARD.encode(&signature),
-        hex::encode(&compressed_signature),
-        general_purpose::STANDARD.encode(&compressed_signature)
-    );
+fn litecoin_verify_official() {
+    unit_test_common_official(AlgorithmType::Litecoin);
 }
 
 #[test]
@@ -593,6 +535,7 @@ fn convert_lite_error() {
     let sk = Generator::random_secret_key().secret_bytes();
     let auth: Box<dyn Auth> = Box::new(LiteConverFaileAuth {
         0: LitecoinAuth {
+            official: false,
             sk,
             compress: true,
             network: bitcoin::Network::Testnet,

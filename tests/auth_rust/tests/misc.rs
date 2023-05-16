@@ -158,22 +158,8 @@ pub fn sign_tx_by_input_group(
                         Bytes::from(buff)
                     };
                 } else {
-                    let converted_message;
-                    if true {
-                        converted_message = config.auth.convert_message_official(&message);
-                        sig = config.auth.sign_official(&converted_message)
-                    } else {
-                        converted_message = config.auth.convert_message(&message);
-                        sig = config.auth.sign(&converted_message)
-                    };
-
-                    use base64::{engine::general_purpose, Engine as _};
-                    dbg!(
-                        &hex::encode(&message),
-                        &hex::encode(&converted_message.as_bytes()),
-                        &hex::encode(&sig),
-                        general_purpose::STANDARD.encode(&sig),
-                    );
+                    let converted_message = config.auth.convert_message(&message);
+                    sig = config.auth.sign(&converted_message)
                 }
 
                 let sig2 = match config.incorrect_sign_size {
@@ -400,8 +386,6 @@ pub struct TestConfig {
     pub incorrect_msg: bool,
     pub incorrect_sign: bool,
     pub incorrect_sign_size: TestConfigIncorrectSing,
-    // whether to use official tools to sign messages
-    pub official: bool,
 }
 
 impl TestConfig {
@@ -419,26 +403,6 @@ impl TestConfig {
             incorrect_msg: false,
             incorrect_sign: false,
             incorrect_sign_size: TestConfigIncorrectSing::None,
-            official: false,
-        }
-    }
-
-    pub fn new_official(
-        auth: &Box<dyn Auth>,
-        entry_category_type: EntryCategoryType,
-        sign_size: i32,
-        official: bool,
-    ) -> TestConfig {
-        assert!(sign_size > 0);
-        TestConfig {
-            auth: auth.clone(),
-            entry_category_type,
-            sign_size,
-            incorrect_pubkey: false,
-            incorrect_msg: false,
-            incorrect_sign: false,
-            incorrect_sign_size: TestConfigIncorrectSing::None,
-            official: true,
         }
     }
 }
@@ -608,18 +572,9 @@ pub trait Auth: DynClone {
     fn get_sign_size(&self) -> usize {
         SIGNATURE_SIZE
     }
-    fn convert_message_official(&self, message: &[u8; 32]) -> H256 {
-        unreachable!("convert_message_official not implemented");
-    }
-    fn get_pub_key_hash_official(&self) -> Vec<u8> {
-        unreachable!("get_pub_key_hash_official not implemented");
-    }
-    fn sign_official(&self, _msg: &H256) -> Bytes {
-        unreachable!("sign_official implemented");
-    }
 }
 
-pub fn auth_builder(t: AlgorithmType) -> result::Result<Box<dyn Auth>, i32> {
+pub fn auth_builder(t: AlgorithmType, official: bool) -> result::Result<Box<dyn Auth>, i32> {
     match t {
         AlgorithmType::Ckb => {
             return Ok(CKbAuth::new());
@@ -648,7 +603,7 @@ pub fn auth_builder(t: AlgorithmType) -> result::Result<Box<dyn Auth>, i32> {
         }
         AlgorithmType::Iso9796_2 => {}
         AlgorithmType::Litecoin => {
-            return Ok(LitecoinAuth::new());
+            return Ok(LitecoinAuth::new_official(official));
         }
         AlgorithmType::OwnerLock => {
             return Ok(OwnerLockAuth::new());
@@ -858,25 +813,6 @@ impl BitcoinAuth {
         H256::from(msg)
     }
     pub fn btc_sign(msg: &H256, privkey: &Privkey, compress: bool) -> Bytes {
-        unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-            ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
-        }
-        let privkey_bytes: &[u8] = unsafe { any_as_u8_slice(privkey) };
-        let privkey_bytes = privkey_bytes.clone();
-
-        let sk = bitcoin::secp256k1::SecretKey::from_slice(&privkey_bytes).unwrap();
-        let bpk = bitcoin::PrivateKey::new(sk, bitcoin::Network::Testnet);
-
-        let pubkey = privkey.pubkey().unwrap();
-        use base64::{engine::general_purpose, Engine as _};
-        dbg!(
-            hex::encode(pubkey.serialize()),
-            bpk.to_wif(),
-            hex::encode(privkey_bytes),
-            hex::encode(bpk.to_bytes()),
-            general_purpose::STANDARD.encode(bpk.to_bytes())
-        );
-
         let sign = privkey.sign_recoverable(&msg).expect("sign").serialize();
         assert_eq!(sign.len(), 65);
         let recid = sign[64];
@@ -890,8 +826,6 @@ impl BitcoinAuth {
         let mut ret = BytesMut::with_capacity(65);
         ret.put_u8(mark);
         ret.put(&sign[0..64]);
-        let signature = hex::encode(&ret);
-        dbg!(compress, recid, mark, signature);
         Bytes::from(ret)
     }
 }
@@ -952,6 +886,8 @@ impl Auth for DogecoinAuth {
 
 #[derive(Clone)]
 pub struct LitecoinAuth {
+    // whether to use official tools to sign messages
+    pub official: bool,
     // Use raw [u8; 32] to easily convert this into Privkey and SecretKey
     pub sk: [u8; 32],
     pub compress: bool,
@@ -960,12 +896,17 @@ pub struct LitecoinAuth {
 impl LitecoinAuth {
     pub fn new() -> Box<LitecoinAuth> {
         let sk: [u8; 32] = Generator::random_secret_key().secret_bytes();
-
         Box::new(LitecoinAuth {
+            official: false,
             sk,
             compress: true,
             network: bitcoin::Network::Testnet,
         })
+    }
+    pub fn new_official(official: bool) -> Box<LitecoinAuth> {
+        let mut auth = Self::new();
+        auth.official = official;
+        auth
     }
     pub fn get_privkey(&self) -> Privkey {
         Privkey::from_slice(&self.sk)
@@ -979,13 +920,13 @@ impl Auth for LitecoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
         BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
     }
-    fn get_pub_key_hash_official(&self) -> Vec<u8> {
-        BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
-    }
     fn get_algorithm_type(&self) -> u8 {
         AlgorithmType::Litecoin as u8
     }
     fn convert_message(&self, message: &[u8; 32]) -> H256 {
+        if self.official {
+            return H256::from(message.clone());
+        }
         let message_magic = b"\x19Litecoin Signed Message:\n\x40";
         let msg_hex = hex::encode(message);
         assert_eq!(msg_hex.len(), 64);
@@ -999,13 +940,10 @@ impl Auth for LitecoinAuth {
 
         H256::from(msg)
     }
-    fn convert_message_official(&self, message: &[u8; 32]) -> H256 {
-        H256::from(message.clone())
-    }
     fn sign(&self, msg: &H256) -> Bytes {
-        BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress)
-    }
-    fn sign_official(&self, msg: &H256) -> Bytes {
+        if !self.official {
+            return BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress);
+        }
         let daemon = LitecoinDaemon::new();
         let wallet_name = "ckb-auth-test-wallet";
         let rpc_wallet_argument = format!("-rpcwallet={}", wallet_name);
@@ -1062,14 +1000,11 @@ impl Auth for LitecoinAuth {
         let file_content = std::fs::read_to_string(wallet_dump).expect("valid wallet dump file");
         for line in file_content.lines() {
             if line.starts_with(&privkey_wif) {
-                dbg!(line, &privkey_wif);
                 for field in line.split_whitespace() {
                     let prefix = "addr=";
                     if field.starts_with(prefix) {
-                        dbg!(field);
                         let mut addresses = field[prefix.len()..].split(",");
                         pubkey = addresses.next();
-                        dbg!(&pubkey);
                         break;
                     }
                 }
@@ -1092,13 +1027,12 @@ impl Auth for LitecoinAuth {
             );
         }
         let signature_base64 = std::str::from_utf8(&output.stdout).unwrap().trim();
-        dbg!(&signature_base64);
         use base64::{engine::general_purpose, Engine as _};
         let signature = general_purpose::STANDARD
             .decode(signature_base64)
             .expect("valid output");
 
-        // Verify this message
+        // Verify this signature anyway to make sure nothing is wrong.
         let verification_output = daemon
             .get_client_command()
             .args(vec![
@@ -1134,6 +1068,7 @@ impl Drop for ProcessGuard {
 
 pub struct LitecoinDaemon {
     data_dir: tempdir::TempDir,
+    #[allow(dead_code)]
     process_guard: ProcessGuard,
     client_executable: String,
     common_arguments: Vec<String>,
