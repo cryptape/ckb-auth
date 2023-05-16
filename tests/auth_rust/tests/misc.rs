@@ -152,7 +152,16 @@ pub fn sign_tx_by_input_group(
                         Bytes::from(buff)
                     };
                 } else {
-                    sig = config.auth.sign(&config.auth.convert_message(&message));
+                    let converted_message = config.auth.convert_message(&message);
+                    sig = config.auth.sign(&converted_message);
+
+                    use base64::{engine::general_purpose, Engine as _};
+                    dbg!(
+                        &hex::encode(&message),
+                        &hex::encode(&converted_message.as_bytes()),
+                        &hex::encode(&sig),
+                        general_purpose::STANDARD.encode(&sig),
+                    );
                 }
 
                 let sig2 = match config.incorrect_sign_size {
@@ -847,6 +856,8 @@ impl BitcoinAuth {
         let mut ret = BytesMut::with_capacity(65);
         ret.put_u8(mark);
         ret.put(&sign[0..64]);
+        let signature = hex::encode(&ret);
+        dbg!(compress, recid, mark, signature);
         Bytes::from(ret)
     }
 }
@@ -931,7 +942,6 @@ impl LitecoinAuth {
 }
 impl Auth for LitecoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
-        dbg!(self.get_btc_private_key().to_wif());
         BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
     }
     fn get_algorithm_type(&self) -> u8 {
@@ -950,20 +960,27 @@ impl Auth for LitecoinAuth {
         let msg = calculate_sha256(&msg);
 
         let wif = "cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4";
-        let key_bytes = bitcoin::PrivateKey::from_wif(wif).unwrap().to_bytes();
-        let signature = Privkey::from_slice(&key_bytes)
+        let private_key_bytes = bitcoin::PrivateKey::from_wif(wif).unwrap().to_bytes();
+        let signature = Privkey::from_slice(&private_key_bytes)
             .sign_recoverable(&H256::from(msg))
-            .expect("sign")
-            .serialize();
+            .expect("sign");
 
         use base64::{engine::general_purpose, Engine as _};
+        let message_before_convert = hex::encode(message);
+        let converted_message = temp2;
+        let hashed_message = hex::encode(msg);
+        let private_key_hex = hex::encode(private_key_bytes);
+        let signature_bytes = signature.serialize();
+        let signature_hex = hex::encode(&signature_bytes);
+        let signature_base64 = general_purpose::STANDARD.encode(&signature_bytes);
         dbg!(
-            message,
-            temp2,
-            msg,
+            message_before_convert,
+            converted_message,
+            hashed_message,
             wif,
-            &key_bytes,
-            general_purpose::STANDARD.encode(&signature),
+            private_key_hex,
+            signature_hex,
+            signature_base64,
             &signature
         );
 
