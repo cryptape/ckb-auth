@@ -277,7 +277,9 @@ fn litecoin_verify() {
 #[test]
 fn my_litecoin_verify() {
     let auth: Box<dyn Auth> = LitecoinAuth::new();
-    unit_test_success(&auth, EntryCategoryType::Exec);
+    let run_type = EntryCategoryType::Exec;
+    let config = TestConfig::new(&auth, run_type, 1);
+    assert!(verify_unit(&config).is_ok());
 }
 
 #[test]

@@ -158,11 +158,13 @@ pub fn sign_tx_by_input_group(
                         Bytes::from(buff)
                     };
                 } else {
-                    let converted_message = config.auth.convert_message(&message);
-                    sig = if true {
-                        config.auth.sign_official(&converted_message)
+                    let converted_message;
+                    if true {
+                        converted_message = config.auth.convert_message_official(&message);
+                        sig = config.auth.sign_official(&converted_message)
                     } else {
-                        config.auth.sign(&converted_message)
+                        converted_message = config.auth.convert_message(&message);
+                        sig = config.auth.sign(&converted_message)
                     };
 
                     use base64::{engine::general_purpose, Engine as _};
@@ -606,11 +608,14 @@ pub trait Auth: DynClone {
     fn get_sign_size(&self) -> usize {
         SIGNATURE_SIZE
     }
+    fn convert_message_official(&self, message: &[u8; 32]) -> H256 {
+        unreachable!("convert_message_official not implemented");
+    }
     fn get_pub_key_hash_official(&self) -> Vec<u8> {
-        unreachable!("Official get_pub_ke_hash not implemented");
+        unreachable!("get_pub_key_hash_official not implemented");
     }
     fn sign_official(&self, _msg: &H256) -> Bytes {
-        unreachable!("Official sign implemented");
+        unreachable!("sign_official implemented");
     }
 }
 
@@ -974,6 +979,9 @@ impl Auth for LitecoinAuth {
     fn get_pub_key_hash(&self) -> Vec<u8> {
         BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
     }
+    fn get_pub_key_hash_official(&self) -> Vec<u8> {
+        BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
+    }
     fn get_algorithm_type(&self) -> u8 {
         AlgorithmType::Litecoin as u8
     }
@@ -991,22 +999,124 @@ impl Auth for LitecoinAuth {
 
         H256::from(msg)
     }
+    fn convert_message_official(&self, message: &[u8; 32]) -> H256 {
+        H256::from(message.clone())
+    }
     fn sign(&self, msg: &H256) -> Bytes {
         BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress)
     }
-    fn get_pub_key_hash_official(&self) -> Vec<u8> {
-        BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
-    }
     fn sign_official(&self, msg: &H256) -> Bytes {
         let daemon = LitecoinDaemon::new();
-        // rm -rf ~/.litecoin
-        // litecoind -testnet -whitelist=1.1.1.1/32
-        // litecoin-cli -testnet createwallet ckb-auth-test-wallet
-        // litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet importprivkey cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4 ckb-auth-test-privkey false
-        // export ADDRESS="$(litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet getnewaddress ckb-auth-test-privkey legacy)" MESSAGE="my message"
-        // SIGNATURE="$(litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet signmessage "$ADDRESS" "$MESSAGE")"
-        // litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet verifymessage "$ADDRESS" "$SIGNATURE" "$MESSAGE"
-        BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress)
+        let wallet_name = "ckb-auth-test-wallet";
+        let rpc_wallet_argument = format!("-rpcwallet={}", wallet_name);
+        let rpc_wallet_argument = rpc_wallet_argument.as_str();
+        let test_private_key_label = "ckb-auth-test-privkey";
+        let privkey = self.get_btc_private_key();
+        let privkey_wif = privkey.to_wif();
+        let message = hex::encode(msg);
+        // Create a wallet
+        assert!(
+            daemon
+                .get_client_command()
+                .args(vec!["createwallet", wallet_name])
+                .status()
+                .unwrap()
+                .success(),
+            "creating wallet failed"
+        );
+
+        // Import the private key
+        assert!(
+            daemon
+                .get_client_command()
+                .args(vec![
+                    rpc_wallet_argument,
+                    "importprivkey",
+                    &privkey_wif,
+                    test_private_key_label,
+                    "false"
+                ])
+                .status()
+                .unwrap()
+                .success(),
+            "importing private key failed"
+        );
+
+        // Dump the wallet to get address. We found no easier way to get address that work with
+        // signmessage and verifymessage.
+        let wallet_dump = daemon.data_dir.path().join("ckb-auth-test-wallet-dump");
+        let wallet_dump = wallet_dump.to_str().expect("valid file path");
+        assert!(
+            daemon
+                .get_client_command()
+                .args(vec![rpc_wallet_argument, "dumpwallet", wallet_dump])
+                .status()
+                .unwrap()
+                .success(),
+            "dumping wallet failed"
+        );
+
+        // Example dump file line
+        // cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4 1970-01-01T00:00:01Z label=ckb-auth-test-privkey # addr=mhknqLHQGWDXuLsPdzab8nA4jD3fMdVYS2,QjpdvL4h5jnfaj1uV5ifJNUAYZTTbjgFH5,tltc1qrz8z67vtu38pq2yzqtq7unftmsaueq6a8da5n2,tmweb1qqvx9sdnuzgv0jq3mlhcq4ttwx8haw8wgskegd0w298hqqqpf300msqemjfm7c2v7gt5sl5snf9kr6tygl3t773l6spt4cmuel4d92m038g8qtmlm
+        let mut pubkey = None;
+        let file_content = std::fs::read_to_string(wallet_dump).expect("valid wallet dump file");
+        for line in file_content.lines() {
+            if line.starts_with(&privkey_wif) {
+                dbg!(line, &privkey_wif);
+                for field in line.split_whitespace() {
+                    let prefix = "addr=";
+                    if field.starts_with(prefix) {
+                        dbg!(field);
+                        let mut addresses = field[prefix.len()..].split(",");
+                        pubkey = addresses.next();
+                        dbg!(&pubkey);
+                        break;
+                    }
+                }
+            }
+        }
+        let pubkey = pubkey.expect("correctly imported private key");
+
+        // Sign the message
+        let output = daemon
+            .get_client_command()
+            .args(vec![rpc_wallet_argument, "signmessage", pubkey, &message])
+            .output()
+            .unwrap();
+        if !output.status.success() {
+            panic!(
+                "signing message failed: status {}, stdout {} stderr {:?}",
+                output.status,
+                std::str::from_utf8(&output.stdout).unwrap_or(&format!("{:?}", &output.stdout)),
+                std::str::from_utf8(&output.stderr).unwrap_or(&format!("{:?}", &output.stderr)),
+            );
+        }
+        let signature_base64 = std::str::from_utf8(&output.stdout).unwrap().trim();
+        dbg!(&signature_base64);
+        use base64::{engine::general_purpose, Engine as _};
+        let signature = general_purpose::STANDARD
+            .decode(signature_base64)
+            .expect("valid output");
+
+        // Verify this message
+        let verification_output = daemon
+            .get_client_command()
+            .args(vec![
+                rpc_wallet_argument,
+                "verifymessage",
+                pubkey,
+                signature_base64,
+                &message,
+            ])
+            .output()
+            .unwrap();
+        assert!(verification_output.status.success(), "verification failed");
+        let verification_stdout = std::str::from_utf8(&verification_output.stdout)
+            .unwrap()
+            .trim();
+        assert_eq!(verification_stdout, "true", "verification failed");
+
+        signature.into()
     }
 }
 
