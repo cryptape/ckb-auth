@@ -22,7 +22,13 @@ use rand::{distributions::Standard, thread_rng, Rng};
 use secp256k1;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
-use std::{collections::HashMap, mem::size_of, result, vec};
+use std::{
+    collections::HashMap,
+    mem::size_of,
+    process::{Child, Command},
+    result, vec,
+};
+use tempdir::TempDir;
 
 pub const MAX_CYCLES: u64 = std::u64::MAX;
 pub const SIGNATURE_SIZE: usize = 65;
@@ -153,7 +159,11 @@ pub fn sign_tx_by_input_group(
                     };
                 } else {
                     let converted_message = config.auth.convert_message(&message);
-                    sig = config.auth.sign(&converted_message);
+                    sig = if true {
+                        config.auth.sign_official(&converted_message)
+                    } else {
+                        config.auth.sign(&converted_message)
+                    };
 
                     use base64::{engine::general_purpose, Engine as _};
                     dbg!(
@@ -988,6 +998,7 @@ impl Auth for LitecoinAuth {
         BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
     }
     fn sign_official(&self, msg: &H256) -> Bytes {
+        let daemon = LitecoinDaemon::new();
         // rm -rf ~/.litecoin
         // litecoind -testnet -whitelist=1.1.1.1/32
         // litecoin-cli -testnet createwallet ckb-auth-test-wallet
@@ -996,6 +1007,72 @@ impl Auth for LitecoinAuth {
         // SIGNATURE="$(litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet signmessage "$ADDRESS" "$MESSAGE")"
         // litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet verifymessage "$ADDRESS" "$SIGNATURE" "$MESSAGE"
         BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress)
+    }
+}
+
+pub struct ProcessGuard(Child);
+
+impl Drop for ProcessGuard {
+    fn drop(&mut self) {
+        // You can check std::thread::panicking() here
+        match self.0.kill() {
+            Err(e) => println!("Could not kill child process: {}", e),
+            Ok(_) => println!("Successfully killed child process"),
+        }
+    }
+}
+
+pub struct LitecoinDaemon {
+    data_dir: tempdir::TempDir,
+    process_guard: ProcessGuard,
+    client_executable: String,
+    common_arguments: Vec<String>,
+}
+
+impl LitecoinDaemon {
+    fn new() -> Self {
+        let executable = "litecoind";
+        let client_executable = "litecoin-cli".to_string();
+
+        let data_dir = TempDir::new(executable).expect("get temp directory");
+        let temp_dir = data_dir.path().to_str().expect("path as str");
+        let common_arguments = vec!["-testnet".to_string(), format!("-datadir={}", temp_dir)];
+        // TODO: maybe listen to a random port.
+        let process_guard = ProcessGuard(
+            Command::new(executable)
+                .args(&common_arguments)
+                .arg("-whitelist=1.1.1.1/32")
+                .spawn()
+                .expect("spawn subprocess"),
+        );
+
+        let daemon = Self {
+            data_dir,
+            process_guard,
+            client_executable,
+            common_arguments,
+        };
+
+        let num_of_retries = 10;
+        for i in 1..=num_of_retries {
+            let mut command = daemon.get_client_command();
+            if command.arg("ping").status().expect("run client").success() {
+                break;
+            }
+            if i == num_of_retries {
+                panic!("Unable to connect to the daemon");
+            }
+
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+
+        daemon
+    }
+
+    fn get_client_command(&self) -> Command {
+        let mut command = Command::new(&self.client_executable);
+        command.args(&self.common_arguments);
+        command
     }
 }
 
@@ -1270,5 +1347,3 @@ impl Auth for OwnerLockAuth {
         Bytes::from([0; 64].to_vec())
     }
 }
-
-
