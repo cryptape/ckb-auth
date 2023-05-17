@@ -12,3 +12,6 @@
 	path = deps/mbedtls
 	url = https://github.com/nervosnetwork/mbedtls.git
 
+[submodule "deps/ed25519"]
+	path = deps/ed25519
+	url = https://github.com/nervosnetwork/ed25519.git
