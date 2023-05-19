@@ -33,3 +33,4 @@ hex = "0.4.3"
 secp256k1 = { version = "0.22.1", features = ["rand-std", "recovery"] }
 dyn-clone = "1.0.4"
 tempdir = "0.3.7"
+which = "4.4.0"

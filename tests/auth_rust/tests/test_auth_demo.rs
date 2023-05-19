@@ -287,6 +287,10 @@ fn litecoin_verify() {
 
 #[test]
 fn litecoin_verify_official() {
+    // We need litecoin binaries to test signing.
+    if which::which("litecoin-cli").is_err() {
+        return;
+    }
     unit_test_common_official(AlgorithmType::Litecoin);
 }
 
