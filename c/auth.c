@@ -810,7 +810,7 @@ int main(int argc, char *argv[]) {
 // 'uint64_t[0]' {aka 'long unsigned int[]'} [-Werror=array-bounds]
 //   810 |     Elf64_Phdr *program_headers = (Elf64_Phdr *)(*phoff);
 //       |                                                 ~^~~~~~~
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 12)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
@@ -845,7 +845,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 12)
 #pragma GCC diagnostic pop
 #endif
 
