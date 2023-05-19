@@ -412,11 +412,9 @@ int convert_eos_message(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
 }
 
 #define MESSAGE_HEX_LEN 64
-const char BTC_MESSAGE_MAGIC[25] = "Bitcoin Signed Message:\n";
-const int8_t BTC_MAGIC_LEN = 24;
-
-int convert_btc_message(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
-                        size_t new_msg_len) {
+int convert_btc_message_variant(const uint8_t *msg, size_t msg_len,
+                                uint8_t *new_msg, size_t new_msg_len,
+                                const char *magic, const uint8_t magic_len) {
     int err = 0;
     if (msg_len != new_msg_len || msg_len != SHA256_SIZE)
         return ERROR_INVALID_ARG;
@@ -425,19 +423,19 @@ int convert_btc_message(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
     bin_to_hex(msg, temp, 32);
 
     // len of magic + magic string + len of message, size is 26 Byte
-    uint8_t magic[BTC_MAGIC_LEN + 2];
-    magic[0] = BTC_MAGIC_LEN;  // MESSAGE_MAGIC length
-    memcpy(&magic[1], BTC_MESSAGE_MAGIC, BTC_MAGIC_LEN);
-    magic[25] = MESSAGE_HEX_LEN;  // message length
+    uint8_t new_magic[magic_len + 2];
+    new_magic[0] = magic_len;  // MESSAGE_MAGIC length
+    memcpy(&new_magic[1], magic, magic_len);
+    new_magic[magic_len + 1] = MESSAGE_HEX_LEN;  // message length
 
     const mbedtls_md_info_t *md_info =
         mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
 
     /* Calculate signature message */
-    uint8_t temp2[BTC_MAGIC_LEN + 2 + MESSAGE_HEX_LEN];
-    uint32_t temp2_size = BTC_MAGIC_LEN + 2 + MESSAGE_HEX_LEN;
-    memcpy(temp2, magic, BTC_MAGIC_LEN + 2);
-    memcpy(temp2 + BTC_MAGIC_LEN + 2, temp, MESSAGE_HEX_LEN);
+    uint8_t temp2[magic_len + 2 + MESSAGE_HEX_LEN];
+    uint32_t temp2_size = magic_len + 2 + MESSAGE_HEX_LEN;
+    memcpy(temp2, new_magic, magic_len + 2);
+    memcpy(temp2 + magic_len + 2, temp, MESSAGE_HEX_LEN);
     err = md_string(md_info, temp2, temp2_size, new_msg);
     if (err != 0) return err;
     err = md_string(md_info, new_msg, SHA256_SIZE, new_msg);
@@ -445,37 +443,31 @@ int convert_btc_message(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
     return 0;
 }
 
+const char BTC_MESSAGE_MAGIC[25] = "Bitcoin Signed Message:\n";
+const int8_t BTC_MAGIC_LEN = 24;
+
+int convert_btc_message(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
+                        size_t new_msg_len) {
+    return convert_btc_message_variant(msg, msg_len, new_msg, new_msg_len,
+                                       BTC_MESSAGE_MAGIC, BTC_MAGIC_LEN);
+}
+
 const char DOGE_MESSAGE_MAGIC[26] = "Dogecoin Signed Message:\n";
 const int8_t DOGE_MAGIC_LEN = 25;
 
 int convert_doge_message(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
                          size_t new_msg_len) {
-    int err = 0;
-    if (msg_len != new_msg_len || msg_len != SHA256_SIZE)
-        return ERROR_INVALID_ARG;
+    return convert_btc_message_variant(msg, msg_len, new_msg, new_msg_len,
+                                       DOGE_MESSAGE_MAGIC, DOGE_MAGIC_LEN);
+}
 
-    uint8_t temp[MESSAGE_HEX_LEN];
-    bin_to_hex(msg, temp, 32);
+const char LITE_MESSAGE_MAGIC[26] = "Litecoin Signed Message:\n";
+const int8_t LITE_MAGIC_LEN = 25;
 
-    // len of magic + magic string + len of message, size is 27 Byte
-    uint8_t magic[DOGE_MAGIC_LEN + 2];
-    magic[0] = DOGE_MAGIC_LEN;
-    memcpy(&magic[1], DOGE_MESSAGE_MAGIC, DOGE_MAGIC_LEN);
-    magic[26] = MESSAGE_HEX_LEN;
-
-    const mbedtls_md_info_t *md_info =
-        mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-
-    /* Calculate signature message */
-    uint8_t temp2[DOGE_MAGIC_LEN + 2 + MESSAGE_HEX_LEN];
-    uint32_t temp2_size = DOGE_MAGIC_LEN + 2 + MESSAGE_HEX_LEN;
-    memcpy(temp2, magic, DOGE_MAGIC_LEN + 2);
-    memcpy(temp2 + DOGE_MAGIC_LEN + 2, temp, MESSAGE_HEX_LEN);
-    err = md_string(md_info, temp2, temp2_size, new_msg);
-    if (err != 0) return err;
-    err = md_string(md_info, new_msg, SHA256_SIZE, new_msg);
-    if (err != 0) return 0;
-    return 0;
+int convert_litecoin_message(const uint8_t *msg, size_t msg_len,
+                             uint8_t *new_msg, size_t new_msg_len) {
+    return convert_btc_message_variant(msg, msg_len, new_msg, new_msg_len,
+                                       LITE_MESSAGE_MAGIC, LITE_MAGIC_LEN);
 }
 
 bool is_lock_script_hash_present(uint8_t *lock_script_hash) {
@@ -718,6 +710,11 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
         err =
             verify(pubkey_hash, signature, signature_size, message,
                    message_size, validate_signature_btc, convert_doge_message);
+        CHECK(err);
+    } else if (auth_algorithm_id == AuthAlgorithmIdLitecoin) {
+        err = verify(pubkey_hash, signature, signature_size, message,
+                     message_size, validate_signature_btc,
+                     convert_litecoin_message);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdCkbMultisig) {
         err = verify_multisig(signature, signature_size, message, pubkey_hash);

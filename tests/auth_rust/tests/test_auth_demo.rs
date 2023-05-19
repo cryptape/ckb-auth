@@ -16,7 +16,7 @@ use misc::{
     assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
     gen_tx_with_grouped_args, sign_tx, AlgorithmType, Auth, AuthErrorCodeType, BitcoinAuth,
     CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader, EntryCategoryType, EosAuth,
-    EthereumAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
+    EthereumAuth, LitecoinAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
 };
 mod misc;
 
@@ -162,14 +162,25 @@ fn unit_test_common_with_auth(auth: &Box<dyn Auth>, run_type: EntryCategoryType)
     unit_test_faileds(auth, run_type);
 }
 
-fn unit_test_common_with_runtype(algorithm_type: AlgorithmType, run_type: EntryCategoryType) {
-    let auth = auth_builder(algorithm_type).unwrap();
+fn unit_test_common_with_runtype(
+    algorithm_type: AlgorithmType,
+    run_type: EntryCategoryType,
+    using_official_client: bool,
+) {
+    let auth = auth_builder(algorithm_type, using_official_client).unwrap();
     unit_test_common_with_auth(&auth, run_type);
 }
 
 fn unit_test_common(algorithm_type: AlgorithmType) {
-    unit_test_common_with_runtype(algorithm_type, EntryCategoryType::DynamicLinking);
-    unit_test_common_with_runtype(algorithm_type, EntryCategoryType::Exec);
+    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Exec] {
+        unit_test_common_with_runtype(algorithm_type, t, false);
+    }
+}
+
+fn unit_test_common_official(algorithm_type: AlgorithmType) {
+    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Exec] {
+        unit_test_common_with_runtype(algorithm_type, t, true);
+    }
 }
 
 #[test]
@@ -267,6 +278,20 @@ fn bitcoin_pubkey_recid_verify() {
 #[test]
 fn dogecoin_verify() {
     unit_test_common(AlgorithmType::Dogecoin);
+}
+
+#[test]
+fn litecoin_verify() {
+    unit_test_common(AlgorithmType::Litecoin);
+}
+
+#[test]
+fn litecoin_verify_official() {
+    // We need litecoin binaries to test signing.
+    if which::which("litecoin-cli").is_err() {
+        return;
+    }
+    unit_test_common_official(AlgorithmType::Litecoin);
 }
 
 #[test]
@@ -481,6 +506,54 @@ fn convert_doge_error() {
     );
 }
 
+#[test]
+fn convert_lite_error() {
+    #[derive(Clone)]
+    struct LiteConverFaileAuth(LitecoinAuth);
+    impl Auth for LiteConverFaileAuth {
+        fn get_pub_key_hash(&self) -> Vec<u8> {
+            BitcoinAuth::get_btc_pub_key_hash(&self.0.get_privkey(), self.0.compress)
+        }
+        fn get_algorithm_type(&self) -> u8 {
+            AlgorithmType::Bitcoin as u8
+        }
+        fn convert_message(&self, message: &[u8; 32]) -> H256 {
+            let message_magic = b"\x18Bitcoin Signed Xessage:\n\x40";
+            let msg_hex = hex::encode(message);
+            assert_eq!(msg_hex.len(), 64);
+
+            let mut temp2: BytesMut = BytesMut::with_capacity(message_magic.len() + msg_hex.len());
+            temp2.put(Bytes::from(message_magic.to_vec()));
+            temp2.put(Bytes::from(hex::encode(message)));
+
+            let msg = misc::calculate_sha256(&temp2);
+            let msg = misc::calculate_sha256(&msg);
+
+            H256::from(msg)
+        }
+        fn sign(&self, msg: &H256) -> Bytes {
+            BitcoinAuth::btc_sign(msg, &self.0.get_privkey(), self.0.compress)
+        }
+    }
+
+    let sk = Generator::random_secret_key().secret_bytes();
+    let auth: Box<dyn Auth> = Box::new(LiteConverFaileAuth {
+        0: LitecoinAuth {
+            official: false,
+            sk,
+            compress: true,
+            network: bitcoin::Network::Testnet,
+        },
+    });
+
+    let config = TestConfig::new(&auth, EntryCategoryType::DynamicLinking, 1);
+    assert_result_error(
+        verify_unit(&config),
+        "failed conver lite",
+        &[AuthErrorCodeType::Mismatched as i32],
+    );
+}
+
 #[derive(Clone)]
 pub struct CkbMultisigFailedAuth(CkbMultisigAuth);
 impl Auth for CkbMultisigFailedAuth {
@@ -604,7 +677,6 @@ fn ckbmultisig_verify_sing_size_failed() {}
 fn schnorr_verify() {
     unit_test_common(AlgorithmType::SchnorrOrTaproot);
 }
-
 
 #[test]
 fn abnormal_algorithm_type() {

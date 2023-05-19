@@ -9,9 +9,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Update submodules
-      run: git submodule update --init
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+    - name: Install litecoin for tests
+      run: |
+        tarball=litecoin.tar.gz
+        wget -O "$tarball" https://download.litecoin.org/litecoin-0.21.2.2/linux/litecoin-0.21.2.2-x86_64-linux-gnu.tar.gz
+        tar xvzf "$tarball"
+        sudo rsync -avz --progress -h --remove-source-files litecoin-*/ /usr/local
     - name: Build contract
       run: make all-via-docker
     - name: Run auth_rust tests

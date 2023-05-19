@@ -22,7 +22,13 @@ use rand::{distributions::Standard, thread_rng, Rng};
 use secp256k1;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
-use std::{collections::HashMap, mem::size_of, result, vec};
+use std::{
+    collections::HashMap,
+    mem::size_of,
+    process::{Child, Command},
+    result, vec,
+};
+use tempdir::TempDir;
 
 pub const MAX_CYCLES: u64 = std::u64::MAX;
 pub const SIGNATURE_SIZE: usize = 65;
@@ -152,7 +158,8 @@ pub fn sign_tx_by_input_group(
                         Bytes::from(buff)
                     };
                 } else {
-                    sig = config.auth.sign(&config.auth.convert_message(&message));
+                    let converted_message = config.auth.convert_message(&message);
+                    sig = config.auth.sign(&converted_message)
                 }
 
                 let sig2 = match config.incorrect_sign_size {
@@ -358,6 +365,7 @@ pub enum AlgorithmType {
     SchnorrOrTaproot = 7,
     RSA = 8,
     Iso9796_2 = 9,
+    Litecoin = 10,
     OwnerLock = 0xFC,
 }
 
@@ -566,7 +574,7 @@ pub trait Auth: DynClone {
     }
 }
 
-pub fn auth_builder(t: AlgorithmType) -> result::Result<Box<dyn Auth>, i32> {
+pub fn auth_builder(t: AlgorithmType, official: bool) -> result::Result<Box<dyn Auth>, i32> {
     match t {
         AlgorithmType::Ckb => {
             return Ok(CKbAuth::new());
@@ -594,6 +602,9 @@ pub fn auth_builder(t: AlgorithmType) -> result::Result<Box<dyn Auth>, i32> {
             return Ok(RSAAuth::new());
         }
         AlgorithmType::Iso9796_2 => {}
+        AlgorithmType::Litecoin => {
+            return Ok(LitecoinAuth::new_official(official));
+        }
         AlgorithmType::OwnerLock => {
             return Ok(OwnerLockAuth::new());
         }
@@ -870,6 +881,243 @@ impl Auth for DogecoinAuth {
     }
     fn sign(&self, msg: &H256) -> Bytes {
         BitcoinAuth::btc_sign(msg, &self.privkey, self.compress)
+    }
+}
+
+#[derive(Clone)]
+pub struct LitecoinAuth {
+    // whether to use official tools to sign messages
+    pub official: bool,
+    // Use raw [u8; 32] to easily convert this into Privkey and SecretKey
+    pub sk: [u8; 32],
+    pub compress: bool,
+    pub network: bitcoin::Network,
+}
+impl LitecoinAuth {
+    pub fn new() -> Box<LitecoinAuth> {
+        let sk: [u8; 32] = Generator::random_secret_key().secret_bytes();
+        Box::new(LitecoinAuth {
+            official: false,
+            sk,
+            compress: true,
+            network: bitcoin::Network::Testnet,
+        })
+    }
+    pub fn new_official(official: bool) -> Box<LitecoinAuth> {
+        let mut auth = Self::new();
+        auth.official = official;
+        auth
+    }
+    pub fn get_privkey(&self) -> Privkey {
+        Privkey::from_slice(&self.sk)
+    }
+    pub fn get_btc_private_key(&self) -> bitcoin::PrivateKey {
+        let sk = bitcoin::secp256k1::SecretKey::from_slice(&self.sk).unwrap();
+        bitcoin::PrivateKey::new(sk, self.network)
+    }
+}
+impl Auth for LitecoinAuth {
+    fn get_pub_key_hash(&self) -> Vec<u8> {
+        BitcoinAuth::get_btc_pub_key_hash(&self.get_privkey(), self.compress)
+    }
+    fn get_algorithm_type(&self) -> u8 {
+        AlgorithmType::Litecoin as u8
+    }
+    fn convert_message(&self, message: &[u8; 32]) -> H256 {
+        if self.official {
+            return H256::from(message.clone());
+        }
+        let message_magic = b"\x19Litecoin Signed Message:\n\x40";
+        let msg_hex = hex::encode(message);
+        assert_eq!(msg_hex.len(), 64);
+
+        let mut temp2: BytesMut = BytesMut::with_capacity(message_magic.len() + msg_hex.len());
+        temp2.put(Bytes::from(message_magic.to_vec()));
+        temp2.put(Bytes::from(hex::encode(message)));
+
+        let msg = calculate_sha256(&temp2);
+        let msg = calculate_sha256(&msg);
+
+        H256::from(msg)
+    }
+    fn sign(&self, msg: &H256) -> Bytes {
+        if !self.official {
+            return BitcoinAuth::btc_sign(msg, &self.get_privkey(), self.compress);
+        }
+        let daemon = LitecoinDaemon::new();
+        let wallet_name = "ckb-auth-test-wallet";
+        let rpc_wallet_argument = format!("-rpcwallet={}", wallet_name);
+        let rpc_wallet_argument = rpc_wallet_argument.as_str();
+        let test_private_key_label = "ckb-auth-test-privkey";
+        let privkey = self.get_btc_private_key();
+        let privkey_wif = privkey.to_wif();
+        let message = hex::encode(msg);
+        // Create a wallet
+        assert!(
+            daemon
+                .get_client_command()
+                .args(vec!["createwallet", wallet_name])
+                .status()
+                .unwrap()
+                .success(),
+            "creating wallet failed"
+        );
+
+        // Import the private key
+        assert!(
+            daemon
+                .get_client_command()
+                .args(vec![
+                    rpc_wallet_argument,
+                    "importprivkey",
+                    &privkey_wif,
+                    test_private_key_label,
+                    "false"
+                ])
+                .status()
+                .unwrap()
+                .success(),
+            "importing private key failed"
+        );
+
+        // Dump the wallet to get address. We found no easier way to get address that work with
+        // signmessage and verifymessage.
+        let wallet_dump = daemon.data_dir.path().join("ckb-auth-test-wallet-dump");
+        let wallet_dump = wallet_dump.to_str().expect("valid file path");
+        assert!(
+            daemon
+                .get_client_command()
+                .args(vec![rpc_wallet_argument, "dumpwallet", wallet_dump])
+                .status()
+                .unwrap()
+                .success(),
+            "dumping wallet failed"
+        );
+
+        // Example dump file line
+        // cQoJiU5ECnVpRqfV5dWKDE2sLQq6516Tja1Hb1GABUV24n7WkqV4 1970-01-01T00:00:01Z label=ckb-auth-test-privkey # addr=mhknqLHQGWDXuLsPdzab8nA4jD3fMdVYS2,QjpdvL4h5jnfaj1uV5ifJNUAYZTTbjgFH5,tltc1qrz8z67vtu38pq2yzqtq7unftmsaueq6a8da5n2,tmweb1qqvx9sdnuzgv0jq3mlhcq4ttwx8haw8wgskegd0w298hqqqpf300msqemjfm7c2v7gt5sl5snf9kr6tygl3t773l6spt4cmuel4d92m038g8qtmlm
+        let mut pubkey = None;
+        let file_content = std::fs::read_to_string(wallet_dump).expect("valid wallet dump file");
+        for line in file_content.lines() {
+            if line.starts_with(&privkey_wif) {
+                for field in line.split_whitespace() {
+                    let prefix = "addr=";
+                    if field.starts_with(prefix) {
+                        let mut addresses = field[prefix.len()..].split(",");
+                        pubkey = addresses.next();
+                        break;
+                    }
+                }
+            }
+        }
+        let pubkey = pubkey.expect("correctly imported private key");
+
+        // Sign the message
+        let output = daemon
+            .get_client_command()
+            .args(vec![rpc_wallet_argument, "signmessage", pubkey, &message])
+            .output()
+            .unwrap();
+        if !output.status.success() {
+            panic!(
+                "signing message failed: status {}, stdout {} stderr {:?}",
+                output.status,
+                std::str::from_utf8(&output.stdout).unwrap_or(&format!("{:?}", &output.stdout)),
+                std::str::from_utf8(&output.stderr).unwrap_or(&format!("{:?}", &output.stderr)),
+            );
+        }
+        let signature_base64 = std::str::from_utf8(&output.stdout).unwrap().trim();
+        use base64::{engine::general_purpose, Engine as _};
+        let signature = general_purpose::STANDARD
+            .decode(signature_base64)
+            .expect("valid output");
+
+        // Verify this signature anyway to make sure nothing is wrong.
+        let verification_output = daemon
+            .get_client_command()
+            .args(vec![
+                rpc_wallet_argument,
+                "verifymessage",
+                pubkey,
+                signature_base64,
+                &message,
+            ])
+            .output()
+            .unwrap();
+        assert!(verification_output.status.success(), "verification failed");
+        let verification_stdout = std::str::from_utf8(&verification_output.stdout)
+            .unwrap()
+            .trim();
+        assert_eq!(verification_stdout, "true", "verification failed");
+
+        signature.into()
+    }
+}
+
+pub struct ProcessGuard(Child);
+
+impl Drop for ProcessGuard {
+    fn drop(&mut self) {
+        // You can check std::thread::panicking() here
+        match self.0.kill() {
+            Err(e) => println!("Could not kill child process: {}", e),
+            Ok(_) => println!("Successfully killed child process"),
+        }
+    }
+}
+
+pub struct LitecoinDaemon {
+    data_dir: tempdir::TempDir,
+    #[allow(dead_code)]
+    process_guard: ProcessGuard,
+    client_executable: String,
+    common_arguments: Vec<String>,
+}
+
+impl LitecoinDaemon {
+    fn new() -> Self {
+        let executable = "litecoind";
+        let client_executable = "litecoin-cli".to_string();
+
+        let data_dir = TempDir::new(executable).expect("get temp directory");
+        let temp_dir = data_dir.path().to_str().expect("path as str");
+        let common_arguments = vec!["-testnet".to_string(), format!("-datadir={}", temp_dir)];
+        // TODO: maybe listen to a random port.
+        let process_guard = ProcessGuard(
+            Command::new(executable)
+                .args(&common_arguments)
+                .arg("-whitelist=1.1.1.1/32")
+                .spawn()
+                .expect("spawn subprocess"),
+        );
+
+        let daemon = Self {
+            data_dir,
+            process_guard,
+            client_executable,
+            common_arguments,
+        };
+
+        let num_of_retries = 10;
+        for i in 1..=num_of_retries {
+            let mut command = daemon.get_client_command();
+            if command.arg("ping").status().expect("run client").success() {
+                break;
+            }
+            if i == num_of_retries {
+                panic!("Unable to connect to the daemon");
+            }
+
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+
+        daemon
+    }
+
+    fn get_client_command(&self) -> Command {
+        let mut command = Command::new(&self.client_executable);
+        command.args(&self.common_arguments);
+        command
     }
 }
 
