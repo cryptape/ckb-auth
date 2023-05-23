@@ -1,6 +1,6 @@
 # ckb-auth litecoin interoperability
 
-Ckb-auth library is able to verify the litecoin signature algorithm.
+Ckb-auth library is able to verify a lot of blockchain signatures including the litecoin.
 We can use `litecoin-cli` (or other compatible wallet) to generate valid transactions and validate them on-chain with ckb-auth.
 
 We need to sign the message with your litecoin private key. The message to be signed is the ASCII hex representation of
