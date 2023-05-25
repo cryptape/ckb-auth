@@ -18,6 +18,8 @@ use blockchain::WitnessArgs;
 use ckb_hash::new_blake2b;
 use ckb_types::core::ScriptHashType;
 use ckb_types::packed;
+use ckb_types::packed::CellOutput;
+use ckb_types::packed::WitnessArgsBuilder;
 use ckb_types::prelude::*;
 use combine_lock_mol::{ChildScript, ChildScriptVec, CombineLockWitness, Uint16};
 use molecule::bytes::Bytes;
@@ -26,11 +28,24 @@ use std::{fs::read_to_string, path::PathBuf};
 
 use auto_complete::auto_complete;
 use ckb_debugger_api::embed::Embed;
+use ckb_jsonrpc_types::JsonBytes;
 use ckb_mock_tx_types::{MockTransaction, ReprMockTransaction};
 use hash::hash;
+use lazy_static::lazy_static;
 use serde_json::from_str as from_json_str;
 use smt::build_tree;
 use sparse_merkle_tree::H256;
+
+enum AuthEntryCategoryType {
+    // Exec = 0,
+    // DL = 1,
+    Spawn = 2,
+}
+
+lazy_static! {
+    pub static ref AUTH_DL: Bytes = Bytes::from(&include_bytes!("../../../build/auth")[..]);
+    pub static ref AUTH_DL_HASH_TYPE: ScriptHashType = ScriptHashType::Data1;
+}
 
 pub fn read_tx_template(file_name: &str) -> Result<ReprMockTransaction, anyhow::Error> {
     let mock_tx =
@@ -202,4 +217,32 @@ pub fn generate_sighash_all(
 
     blake2b.finalize(&mut message);
     Ok(message)
+}
+
+pub fn update_auth_code_hash(tx: &mut ReprMockTransaction) {
+    let hash = CellOutput::calc_data_hash(&AUTH_DL).as_slice().to_vec();
+    for input in tx.mock_info.inputs.as_mut_slice() {
+        let mut buf = input.output.lock.args.as_bytes().to_vec();
+        buf.extend_from_slice(&hash);
+
+        buf.extend_from_slice(&[
+            AUTH_DL_HASH_TYPE.clone().into(),
+            AuthEntryCategoryType::Spawn as u8,
+        ]);
+
+        input.output.lock.args = JsonBytes::from_vec(buf);
+    }
+}
+
+pub fn update_witness(tx: &mut ReprMockTransaction, witnesses_data: Vec<Vec<u8>>) {
+    tx.tx.witnesses.clear();
+
+    for witness in witnesses_data {
+        tx.tx.witnesses.push(JsonBytes::from_bytes(
+            WitnessArgsBuilder::default()
+                .lock(Some(Bytes::from(witness.to_vec())).pack())
+                .build()
+                .as_bytes(),
+        ));
+    }
 }

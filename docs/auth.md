@@ -103,8 +103,14 @@ Key parameters:
 
 Key parameters: same as bitcoin
 
+#### CardanoLock(algorithm_id=11)
+
+Key parameters:
+- signature: cardano signed data.
+- pubkey: 32 compressed pubkey
+- pubkey hash: blake160 of pubkey
+
 #### More blockchains Support Are Ongoing ...
-- Cardano
 - XRP
 - Monero
 - Solana
