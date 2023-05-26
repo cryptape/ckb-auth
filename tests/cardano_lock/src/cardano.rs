@@ -140,7 +140,7 @@ pub fn get_signature_struct(path: &str) -> (Vec<u8>, Vec<u8>) {
         .get(1)
         .as_bytes()
         .unwrap();
-    
+
     let data = load_file(path);
 
     let mut des_data = Deserializer::from(std::io::Cursor::new(data));
