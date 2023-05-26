@@ -4,9 +4,23 @@
 [Cardano](https://cardano.org/) is a blockchain platform for changemakers, innovators, and visionaries, with the tools and technologies required to create possibility for the many, as well as the few, and bring about positive global change.
 
 
-## Signature struct
-Data structures generated according to [CIP-8](https://cips.cardano.org/cips/cip8/)
+## Signature
+When signing, refer to some designs of [CIP-8](https://cips.cardano.org/cips/cip8/).
+The signature struct uses CBOR, This makes it easier for users to view signature information.
 
+Struct:
+```text
+83      # Root array, size is 3
+    82      # Store the necessary signature information
+        58 20   # From generate_sighash_all 32 bytes
+            xxxxxxx
+        58 20   # Public key, 32 bytes
+            xxxxxxx
+    xx      # custom data
+        xxxxxx
+    58 40   # Signature data 64 bytes
+        xxxxxxx
+```
 
 ## Test
 Test with official tools, but the tx hash is used as the signed data when constructing the witness of the transaction. Therefore, it is only used as an indirect comparison.
