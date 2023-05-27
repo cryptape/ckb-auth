@@ -22,6 +22,8 @@ Struct:
         xxxxxxx
 ```
 
+
+
 ## Test
 Test with official tools, but the tx hash is used as the signed data when constructing the witness of the transaction. Therefore, it is only used as an indirect comparison.
 

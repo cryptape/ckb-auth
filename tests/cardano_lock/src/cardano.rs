@@ -1,68 +1,17 @@
-use super::{blockchain, cardano_lock_mol};
 use blake2b_rs::Blake2bBuilder;
 use cardano_message_signing::{
-    builders::{AlgorithmId, COSESign1Builder},
     cbor::{CBORArray, CBORValue},
-    utils::{Deserialize, Int, ToBytes},
-    HeaderMap, Headers, Label, ProtectedHeaderMap,
+    utils::{Deserialize, Int},
 };
 use cardano_serialization_lib::crypto::{PrivateKey, PublicKey};
 use cbor_event::de::Deserializer;
-use ckb_types::{bytes::Bytes, core::ScriptHashType, prelude::*};
+use ckb_types::{bytes::Bytes, core::ScriptHashType};
 use lazy_static::lazy_static;
 use molecule::prelude::*;
 
 lazy_static! {
     pub static ref AUTH_DL: Bytes = Bytes::from(&include_bytes!("../../../build/auth")[..]);
     pub static ref AUTH_DL_HASH_TYPE: ScriptHashType = ScriptHashType::Data1;
-}
-
-pub fn cardano_sign(privkey: &PrivateKey, payload: &[u8; 32]) -> Vec<u8> {
-    let mut witness_builder = cardano_lock_mol::CardanoWitnessLockBuilder::default();
-    let pubkey = privkey.to_public().as_bytes();
-    witness_builder = witness_builder.pubkey(blockchain::Byte32::from_slice(&pubkey).unwrap());
-
-    let mut protected_headers = HeaderMap::new();
-    protected_headers.set_algorithm_id(&Label::from_algorithm_id(AlgorithmId::EdDSA.into()));
-
-    // TODO
-    let stake_privkey = PrivateKey::from_normal_bytes(&[0u8; 32]).unwrap();
-
-    let base_addr = cardano_serialization_lib::address::BaseAddress::new(
-        0,
-        &cardano_serialization_lib::address::StakeCredential::from_keyhash(
-            &privkey.to_public().hash(),
-        ),
-        &cardano_serialization_lib::address::StakeCredential::from_keyhash(
-            &stake_privkey.to_public().hash(),
-        ),
-    );
-    protected_headers
-        .set_header(
-            &Label::new_text(String::from("address")),
-            &CBORValue::new_bytes(base_addr.to_address().to_bytes()),
-        )
-        .expect("set header failed");
-
-    let protected_serialized: ProtectedHeaderMap = ProtectedHeaderMap::new(&protected_headers);
-
-    let headers = Headers::new(&protected_serialized, &HeaderMap::new());
-    let builder = COSESign1Builder::new(&headers, payload.as_slice().to_vec(), false);
-    let to_sign = builder.make_data_to_sign().to_bytes();
-
-    witness_builder = witness_builder.sig_structure(
-        blockchain::BytesBuilder::default()
-            .set(to_sign.iter().map(|f| Byte::new(f.clone())).collect())
-            .build(),
-    );
-
-    let sig = privkey.sign(&to_sign).to_bytes();
-
-    witness_builder =
-        witness_builder.signature(cardano_lock_mol::Byte64::from_slice(&sig).unwrap());
-
-    let witness_data = witness_builder.build();
-    witness_data.as_bytes().to_vec()
 }
 
 pub fn load_file(path: &str) -> Vec<u8> {

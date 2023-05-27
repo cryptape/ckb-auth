@@ -1,4 +1,3 @@
-#include "_ckb_debugger.h"
 #include "ckb_consts.h"
 #include "stdio.h"
 #if defined(CKB_USE_SIM)
@@ -9,14 +8,6 @@
 
 #include "ckb_syscalls.h"
 #endif
-
-#ifndef MOL2_EXIT
-#define MOL2_EXIT ckb_exit
-#endif
-
-#include "cardano_lock_mol.h"
-#include "cardano_lock_mol2.h"
-#include "molecule/molecule_reader.h"
 
 //
 #include "nanocbor.h"

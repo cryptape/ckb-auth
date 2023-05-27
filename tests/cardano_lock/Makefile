@@ -10,18 +10,6 @@ CARDANO_LOCK_TOOLS_URL=https://update-cardano-mainnet.iohk.io/cardano-node-relea
 all: \
 	cardano-success
 
-mol:
-	rm -f src/blockchain.rs
-	rm -f src/cardano_lock_mol.rs
-	make src/blockchain.rs
-	make src/cardano_lock_mol.rs
-
-src/cardano_lock_mol.rs: ../../c/cardano_lock.mol
-	${MOLC} --language rust --schema-file $< | rustfmt > $@
-
-src/blockchain.rs: ../../c/blockchain.mol
-	${MOLC} --language rust --schema-file $< | rustfmt > $@
-
 gen_cardano_signature:
 	mkdir -p test_data
 	./bin/cardano-cli node key-gen \

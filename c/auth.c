@@ -1,6 +1,3 @@
-#define CKB_C_STDLIB_PRINTF
-#include <stdio.h>
-
 // clang-format off
 #include "mbedtls/md.h"
 #include "mbedtls/md_internal.h"

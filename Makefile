@@ -9,9 +9,6 @@ LDFLAGS := -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections
 SECP256K1_SRC_20210801 := deps/secp256k1-20210801/src/ecmult_static_pre_context.h
 AUTH_CFLAGS := $(CFLAGS) -I deps/mbedtls/include -I deps/ed25519/src -I c/cardano/nanocbor -Wno-array-bounds -Wno-stringop-overflow
 
-MOLC := moleculec
-MOLC_VERSION := 0.7.0
-
 # RSA/mbedtls
 CFLAGS_MBEDTLS := $(subst ckb-c-std-lib,ckb-c-stdlib-2023,$(CFLAGS)) -I deps/mbedtls/include
 LDFLAGS_MBEDTLS := $(LDFLAGS)
@@ -47,19 +44,6 @@ $(SECP256K1_SRC_20210801):
 deps/mbedtls/library/libmbedcrypto.a:
 	cp deps/mbedtls-config-template.h deps/mbedtls/include/mbedtls/config.h
 	make -C deps/mbedtls/library APPLE_BUILD=0 AR=$(AR) CC=${CC} LD=${LD} CFLAGS="${PASSED_MBEDTLS_CFLAGS}" libmbedcrypto.a
-
-mol:
-	rm -f c/cardano/cardano_lock_mol.h
-	rm -f c/cardano/cardano_lock_mol2.h
-	make c/cardano/cardano_lock_mol.h
-	make c/cardano/cardano_lock_mol2.h
-
-c/cardano/cardano_lock_mol.h: c/cardano/cardano_lock.mol
-	${MOLC} --language c --schema-file $< > $@
-
-c/cardano/cardano_lock_mol2.h: c/cardano/cardano_lock.mol
-	moleculec --language - --schema-file c/cardano/cardano_lock.mol --format json > build/blockchain_mol2.json
-	moleculec-c2 --input build/blockchain_mol2.json | clang-format -style=Google > c/cardano/cardano_lock_mol2.h
 
 build/nanocbor/%.o: c/cardano/nanocbor/%.c
 	mkdir -p build/nanocbor
