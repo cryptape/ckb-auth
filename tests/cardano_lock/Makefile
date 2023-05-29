@@ -8,7 +8,6 @@ CARDANO_LOCK_TOOLS_URL=https://update-cardano-mainnet.iohk.io/cardano-node-relea
 #CARDANO_LOCK_TOOLS_URL=https://update-cardano-mainnet.iohk.io/cardano-node-releases/cardano-node-8.0.0-macos.tar.gz
 
 all: \
-	make_cardano_example \
 	cardano-success
 
 gen_cardano_signature:
@@ -40,6 +39,3 @@ install:
 install_cardano_tools:
 	mkdir -p bin
 	cd bin && wget ${CARDANO_LOCK_TOOLS_URL} && tar -xf `basename -- $(CARDANO_LOCK_TOOLS_URL)`
-
-make_cardano_example:
-	cd ../.. && make -f examples/cardano-demo/Makefile all
