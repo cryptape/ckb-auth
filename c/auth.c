@@ -337,7 +337,7 @@ int validate_signature_cardano(void *prefilled_data, const uint8_t *sig,
     CardanoSignatureData cardano_data;
     uint8_t sign_data_buffer[sig_len];
     memcpy(sign_data_buffer, sig, sig_len);
-    CHECK2(get_cardano_sign_data2(sign_data_buffer, sig_len, &cardano_data) ==
+    CHECK2(get_cardano_sign_data(sign_data_buffer, sig_len, &cardano_data) ==
                CardanoSuccess,
            ERROR_INVALID_ARG);
 

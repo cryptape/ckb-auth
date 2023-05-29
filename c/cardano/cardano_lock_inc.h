@@ -53,8 +53,8 @@ typedef struct {
     uint8_t signature[CARDANO_LOCK_SIGNATURE_SIZE];
 } CardanoSignatureData;
 
-int get_cardano_sign_data2(uint8_t *data, size_t data_len,
-                           CardanoSignatureData *output) {
+int get_cardano_sign_data(uint8_t *data, size_t data_len,
+                          CardanoSignatureData *output) {
     int err = CardanoSuccess;
 
     nanocbor_value_t root_node = {0};
@@ -62,13 +62,14 @@ int get_cardano_sign_data2(uint8_t *data, size_t data_len,
 
     CHECK2(nanocbor_get_type(&root_node) == NANOCBOR_TYPE_ARR,
            CardanoErr_CBORType);
-    nanocbor_value_t root_arr_node;
-    CHECK2(nanocbor_enter_array(&root_node, &root_arr_node) == NANOCBOR_OK,
+    nanocbor_value_t root_array_node;
+    CHECK2(nanocbor_enter_array(&root_node, &root_array_node) == NANOCBOR_OK,
            CardanoErr_CBORParse);
 
     nanocbor_value_t sign_data_node;
-    CHECK2(nanocbor_enter_array(&root_arr_node, &sign_data_node) == NANOCBOR_OK,
-           CardanoErr_CBORParse);
+    CHECK2(
+        nanocbor_enter_array(&root_array_node, &sign_data_node) == NANOCBOR_OK,
+        CardanoErr_CBORParse);
 
     uint8_t *sign_msg_ptr = NULL;
     size_t sign_msg_ptr_len = 0;
@@ -92,14 +93,14 @@ int get_cardano_sign_data2(uint8_t *data, size_t data_len,
            CardanoErr_InvaildPubKeyLen);
     memcpy(output->public_key, pubkey_ptr, pubkey_ptr_len);
 
-    nanocbor_skip(&root_arr_node);
-    nanocbor_skip(&root_arr_node);
+    nanocbor_skip(&root_array_node);
+    nanocbor_skip(&root_array_node);
 
     uint8_t *sign_ptr = NULL;
     size_t sign_ptr_len = 0;
-    CHECK2(nanocbor_get_type(&root_arr_node) == NANOCBOR_TYPE_BSTR,
+    CHECK2(nanocbor_get_type(&root_array_node) == NANOCBOR_TYPE_BSTR,
            CardanoErr_CBORType);
-    CHECK2(nanocbor_get_bstr(&root_arr_node, (const uint8_t **)&sign_ptr,
+    CHECK2(nanocbor_get_bstr(&root_array_node, (const uint8_t **)&sign_ptr,
                              &sign_ptr_len) == NANOCBOR_OK,
            CardanoErr_CBORParse);
     CHECK2(sign_ptr_len == CARDANO_LOCK_SIGNATURE_SIZE,
@@ -110,3 +111,23 @@ int get_cardano_sign_data2(uint8_t *data, size_t data_len,
 exit:
     return err;
 };
+
+int get_cardano_custom(const uint8_t *data, size_t data_len,
+                       nanocbor_value_t *custom_node) {
+    int err = CardanoSuccess;
+
+    nanocbor_value_t root_node = {0};
+    nanocbor_decoder_init(&root_node, data, data_len);
+
+    CHECK2(nanocbor_get_type(&root_node) == NANOCBOR_TYPE_ARR,
+           CardanoErr_CBORType);
+    nanocbor_value_t root_array_node;
+    CHECK2(nanocbor_enter_array(&root_node, &root_array_node) == NANOCBOR_OK,
+           CardanoErr_CBORParse);
+
+    nanocbor_skip(&root_array_node);
+
+    memcpy(custom_node, &root_array_node, sizeof(root_array_node));
+exit:
+    return err;
+}

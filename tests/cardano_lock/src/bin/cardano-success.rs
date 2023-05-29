@@ -3,7 +3,7 @@ use cardano_lock::cardano::*;
 use cardano_lock::*;
 use cardano_message_signing::{
     cbor::{CBORArray, CBORValue},
-    utils::ToBytes,
+    utils::{Int, ToBytes},
 };
 use cardano_serialization_lib::{
     crypto::{Ed25519Signature, PrivateKey, PublicKey},
@@ -29,9 +29,9 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let private_key = load_private_key(G_PRIVATE_KEY_PATH);
     let public_key = load_public_key(G_PUBLIC_KEY_PATH);
-
     let signature = generate_witness(&tx, &private_key, &public_key, false);
     update_witness(&mut tx, vec![signature]);
+    // println!("{:02X?}", tx.tx.witnesses.get(0).unwrap().as_bytes());
 
     let json = serde_json::to_string_pretty(&tx).unwrap();
     println!("{}", json);
@@ -82,7 +82,53 @@ fn generate_witness(
     root.add(&CBORValue::new_array(&sign_data));
 
     // custom data
-    root.add(&CBORValue::new_array(&CBORArray::new()));
+    let mut custom_node = CBORArray::new();
+    custom_node.add(&CBORValue::new_int(&Int::new_i32(0x123123)));
+
+    // lock code hash
+    custom_node.add(&CBORValue::new_bytes({
+        use ckb_types::{
+            packed::{Byte, Byte32, ScriptBuilder},
+            prelude::*,
+        };
+
+        let lock = &tx.mock_info.inputs.get(0).unwrap().output.lock;
+        let sc = ScriptBuilder::default()
+            .code_hash(Byte32::new(
+                lock.code_hash.as_bytes().to_vec().try_into().unwrap(),
+            ))
+            .args(lock.args.as_bytes().pack())
+            .hash_type(Byte::new(lock.hash_type.clone() as u8))
+            .build();
+
+        sc.calc_script_hash().as_bytes().to_vec()
+    }));
+
+    // input capacity
+    custom_node.add(&CBORValue::new_bytes(
+        tx.mock_info
+            .inputs
+            .get(0)
+            .unwrap()
+            .output
+            .capacity
+            .value()
+            .to_le_bytes()
+            .to_vec(),
+    ));
+
+    // output cap
+    custom_node.add(&CBORValue::new_bytes(
+        tx.tx
+            .outputs
+            .get(0)
+            .unwrap()
+            .capacity
+            .value()
+            .to_le_bytes()
+            .to_vec(),
+    ));
+    root.add(&CBORValue::new_array(&custom_node));
 
     let mut root2 = root.clone();
     root.add(&CBORValue::new_bytes([0u8; 64].to_vec()));
