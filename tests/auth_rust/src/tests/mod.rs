@@ -14,6 +14,8 @@ use rand::{thread_rng, Rng};
 use sha3::{digest::generic_array::typenum::private::IsEqualPrivate, Digest, Keccak256};
 use std::sync::Arc;
 
+use hex_literal::hex;
+
 use crate::{
     assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
     gen_tx_scripts_verifier, gen_tx_with_grouped_args, sign_tx, AlgorithmType, Auth,
@@ -289,6 +291,11 @@ fn litecoin_verify_official() {
         return;
     }
     unit_test_common_official(AlgorithmType::Litecoin);
+}
+
+#[test]
+fn monero_verify() {
+    unit_test_common(AlgorithmType::Monero);
 }
 
 #[test]

@@ -14,4 +14,4 @@
 
 [submodule "deps/ed25519"]
 	path = deps/ed25519
-	url = https://github.com/nervosnetwork/ed25519.git
+	url = https://github.com/contrun/ed25519.git
