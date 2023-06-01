@@ -17,7 +17,7 @@ jobs:
         tarball=litecoin.tar.gz
         wget -O "$tarball" https://download.litecoin.org/litecoin-0.21.2.2/linux/litecoin-0.21.2.2-x86_64-linux-gnu.tar.gz
         tar xvzf "$tarball"
-        sudo rsync -avz --progress -h --remove-source-files litecoin-*/ /usr/local
+        sudo cp -r litecoin-*/* /usr/local
     - name: Build contract
       run: make all-via-docker
     - name: Run auth_rust tests

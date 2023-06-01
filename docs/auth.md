@@ -99,9 +99,12 @@ Key parameters:
 - pubkey: 32 compressed pubkey
 - pubkey hash: blake160 of pubkey
 
+#### Litecoin(algorithm_id=10)
+
+Key parameters: same as bitcoin
+
 #### More blockchains Support Are Ongoing ...
 - Cardano
-- Litecoin
 - XRP
 - Monero
 - Solana
