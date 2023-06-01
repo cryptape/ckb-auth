@@ -7,6 +7,7 @@ library.
 ## Build
 
 ``` bash
+git submodule update --init
 make all-via-docker
 ```
 For more details, please check out [CI script](./.github/workflows/rust.yml).
