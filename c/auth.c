@@ -333,20 +333,20 @@ int validate_signature_cardano(void *prefilled_data, const uint8_t *sig,
                                size_t msg_len, uint8_t *output,
                                size_t *output_len) {
     int err = 0;
+
     if (*output_len < BLAKE160_SIZE) {
         return SECP256K1_PUBKEY_SIZE;
     }
 
     CardanoSignatureData cardano_data;
-    uint8_t sign_meesage[sig_len];
-    memcpy(sign_meesage, sig, sig_len);
-    CHECK2(get_cardano_sign_data(sign_meesage, sig_len, &cardano_data) ==
-               CardanoSuccess,
+    CHECK2(get_cardano_data(sig, sig_len, &cardano_data) == CardanoSuccess,
            ERROR_INVALID_ARG);
 
-    CHECK2(memcmp(msg, cardano_data.sign_msg, msg_len) == 0, ERROR_INVALID_ARG);
+    CHECK2(memcmp(msg, cardano_data.ckb_sign_msg, msg_len) == 0,
+           ERROR_INVALID_ARG);
 
-    int suc = ed25519_verify(cardano_data.signature, sign_meesage, sig_len,
+    int suc = ed25519_verify(cardano_data.signature, cardano_data.sign_message,
+                             CARDANO_LOCK_SIGNATURE_MESSAGE_SIZE,
                              cardano_data.public_key);
     CHECK2(suc == 1, ERROR_EXEC_INVALID_SIG);
 

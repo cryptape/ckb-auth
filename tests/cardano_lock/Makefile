@@ -8,26 +8,18 @@ CARDANO_LOCK_TOOLS_URL=https://update-cardano-mainnet.iohk.io/cardano-node-relea
 #CARDANO_LOCK_TOOLS_URL=https://update-cardano-mainnet.iohk.io/cardano-node-releases/cardano-node-8.0.0-macos.tar.gz
 
 all: \
+	gen_cardano_key \
 	cardano-success
 
-gen_cardano_signature:
+gen_cardano_key:
 	mkdir -p test_data
 	./bin/cardano-cli node key-gen \
 		--cold-verification-key-file test_data/cold.vkey.json \
 		--cold-signing-key-file test_data/cold.skey.json \
 		--operational-certificate-issue-counter-file test_data/cold.counter.json
-	./bin/cardano-cli transaction build-raw \
-		--shelley-era \
-		--tx-in 1100000000000000000000000000000000000000000000000000000000000000#0 \
-		--tx-out addr_test1vp2fg770ddmqxxduasjsas39l5wwvwa04nj8ud95fde7f7guscp6v+1 \
-		--invalid-hereafter 0 \
-		--fee 7 \
-		--out-file test_data/cardano_tx.json
-	./bin/cardano-cli transaction sign \
-		--tx-body-file test_data/cardano_tx.json \
-		--signing-key-file test_data/cold.skey.json \
-		--mainnet \
-		--out-file test_data/cardano_tx.signed.json
+
+gen_cardano_signature:
+	./src/gen_cardano_signature.sh
 
 cardano-success: gen_cardano_signature
 	cargo run --bin cardano-success > tx.json
@@ -39,3 +31,7 @@ install:
 install_cardano_tools:
 	mkdir -p bin
 	cd bin && wget ${CARDANO_LOCK_TOOLS_URL} && tar -xf `basename -- $(CARDANO_LOCK_TOOLS_URL)`
+
+clean:
+	rm -rf test_data/*
+	cargo clean

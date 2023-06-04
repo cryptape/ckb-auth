@@ -1,5 +1,12 @@
 pub mod cardano;
 
+pub const G_PRIVATE_KEY_PATH: &str = "test_data/cold.skey.json";
+pub const G_PUBLIC_KEY_PATH: &str = "test_data/cold.vkey.json";
+pub const G_TX_PATH: &str = "test_data/cardano_tx.json";
+pub const G_TX_SIGNED_PATH: &str = "test_data/cardano_tx.signed.json";
+
+pub const G_CKB_TX_INDEX: usize = 0;
+
 use ckb_jsonrpc_types::JsonBytes;
 use ckb_mock_tx_types::ReprMockTransaction;
 

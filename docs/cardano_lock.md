@@ -5,37 +5,25 @@
 
 
 ## Signature
-When signing, refer to some designs of [CIP-8](https://cips.cardano.org/cips/cip8/).
-The signature struct uses CBOR, This makes it easier for users to view signature information.
-
-Struct:
-```text
-83      # Root array, size is 3
-    82      # Store the necessary signature information
-        58 20   # From generate_sighash_all 32 bytes
-            xxxxxxx
-        58 20   # Public key, 32 bytes
-            xxxxxxx
-    xx      # custom data
-        xxxxxx
-    58 40   # Signature data 64 bytes
-        xxxxxxx
-```
+Signatures are structured using CBOR. In order to ensure compatibility with cadrano-cli and the security of transactions, some modifications have been made to the original structure here:
+The transaction hash of the Input is passed into ```generate_sighash_all``` function in ckb-auth as a hash.
 
 
-
-## Test
-Test with official tools, but the tx hash is used as the signed data when constructing the witness of the transaction. Therefore, it is only used as an indirect comparison.
-
-First generate the key, transaction data, and sign the transaction.
+### Generate signature
+1. Use cardano-cli to generate key.
 ```bash
 ./bin/cardano-cli node key-gen \
     --cold-verification-key-file test_data/cold.vkey.json \
     --cold-signing-key-file test_data/cold.skey.json \
     --operational-certificate-issue-counter-file test_data/cold.counter.json
-./bin/cardano-cli transaction build-raw \
+```
+2. Use get-sign-hash to generate hash. (tests/cardano_lock/src/bin/get-sign-hash.rs)
+3. Generate a tx with cardano and sign
+```bash
+sign_hash=`./target/debug/get-sign-hash`
+.bin/cardano-cli transaction build-raw \
     --shelley-era \
-    --tx-in 1100000000000000000000000000000000000000000000000000000000000000#0 \
+    --tx-in $sign_hash#0 \
     --tx-out addr_test1vp2fg770ddmqxxduasjsas39l5wwvwa04nj8ud95fde7f7guscp6v+1 \
     --invalid-hereafter 0 \
     --fee 7 \
@@ -46,12 +34,11 @@ First generate the key, transaction data, and sign the transaction.
     --mainnet \
     --out-file test_data/cardano_tx.signed.json
 ```
-* ```cold.skey.json``` is private key
-* ```cold.vkey.json``` is public key
-* ```cardano_tx.json``` is transaction data
-* ```cardano_tx.signed.json``` is signatured
+4. Pass the whole cborHex in the output json as the witnesses of ckb-auth.
 
-Then, use the public key in cardano-success to verify the data.
-Verify uses the same library(cardano_serialization_lib) as the signature data witness into the script, so that it can be indirectly verified to be compatible with the official.
+You can refer to the Makefile of cardano-test (tests/cardano_lock/Makefile).
 
-
+### Elements
+* The generated key/tx is a readable JSON file, where cborHex represents the actual CBOR data.
+* The Cardano pubkey is directly extracted after generation.
+* The Cardano signature message only applies to the critical transaction parts, excluding the metadata. Therefore, here, only the input transaction hash can be used.
