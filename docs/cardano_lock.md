@@ -42,3 +42,7 @@ You can refer to the Makefile of cardano-test (tests/cardano_lock/Makefile).
 * The generated key/tx is a readable JSON file, where cborHex represents the actual CBOR data.
 * The Cardano pubkey is directly extracted after generation.
 * The Cardano signature message only applies to the critical transaction parts, excluding the metadata. Therefore, here, only the input transaction hash can be used.
+
+### Install cardano-cli
+Download from the [official](https://github.com/input-output-hk/cardano-node/releases/tag/8.0.0).
+You can use --help to view more related commands. The relevant commands we used can be independent of the cardano-node (Cardano network).
