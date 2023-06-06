@@ -52,7 +52,10 @@ Due to the deprecation of [old address format (p2pkh address)](https://en.bitcoi
 we need to obtain the legacy p2pkh address of the litecoin account to sign messages.
 
 The easiest way to do such thing is to label the account (say with `ckb-auth-test-privkey`) 
-and dump all its address, we can run `litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet getaddressesbylabel ckb-auth-test-privkey`.
+and dump all its address, we can run 
+```
+litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet getaddressesbylabel ckb-auth-test-privkey
+```
 Here's the output when I run that script:
 ```json
 {
