@@ -1,0 +1,12 @@
+[package]
+name = "rust-ckb-auth"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ckb-std = "0.12.1"
+log = { version = "0.4.17", default-features = false }
+hex = { version = "0.4.3", default-features = false, features = ["alloc"]}
+blake2b-rs = "0.2.0"
