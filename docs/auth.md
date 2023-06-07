@@ -179,3 +179,27 @@ int ckb_auth(EntryType* entry, CkbAuthType *id, uint8_t *signature, uint32_t sig
 ```
 Most of developers only need to use this function without knowing the low level APIs.
 
+
+### Rust High Level APIs
+Provide a Rust interface, you can directly call the related functions of ckb-auth in rust.
+
+Dependencies name: `rust-ckb-auth`
+
+#### API Description
+``` rust
+pub fn ckb_auth(
+    entry: &CkbEntryType,
+    id: &CkbAuthType,
+    signature: &[u8],
+    message: &[u8; 32],
+) -> Result<(), CkbAuthError>
+```
+
+`CkbEntryType` : On-chain information and calling method of auth script.
+
+`CkbAuthType` : Auth Algorithm Id and public key hash
+
+`signature` : signature data.
+
+`message` : Participate in the message data of the signature.
+
