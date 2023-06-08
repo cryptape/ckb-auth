@@ -9,6 +9,7 @@ auth-spawn-success:
 	${CKB_DEBUGGER} --tx-file=tx.json -s lock
 
 auth-spawn-rust-success:
+	cd ../.. && capsule build
 	cargo run --bin auth-spawn-rust-success > tx.json
 	${CKB_DEBUGGER} --tx-file=tx.json -s lock
 
