@@ -15,3 +15,4 @@ auth-spawn-rust-success:
 
 install:
 	cargo install --locked --branch ckb2023 --git https://github.com/nervosnetwork/ckb-standalone-debugger ckb-debugger
+	cargo install ckb-capsule --git https://github.com/nervosnetwork/capsule.git --tag v0.9.2
