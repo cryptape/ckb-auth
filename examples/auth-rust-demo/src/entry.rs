@@ -9,18 +9,19 @@ use core::result::Result;
 
 // Import CKB syscalls and structures
 // https://docs.rs/ckb-std/
+
 use crate::error::Error;
 
 use rust_ckb_auth::ckb_auth::{
     ckb_auth, AuthAlgorithmIdType, CkbAuthType, CkbEntryType, EntryCategoryType,
 };
 
+use super::utils::generate_sighash_all::generate_sighash_all;
 use ckb_std::{
     ckb_constants::Source,
     ckb_types::{bytes::Bytes, core::ScriptHashType, prelude::*},
     high_level::{load_script, load_witness_args},
 };
-use rust_ckb_auth::generate_sighash_all::generate_sighash_all;
 
 // use ckb_std::debug;
 

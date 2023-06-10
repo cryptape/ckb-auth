@@ -13,17 +13,15 @@
 // define modules
 mod entry;
 mod error;
+mod utils;
 
 use ckb_std::default_alloc;
-use rust_ckb_auth::logger;
 
 ckb_std::entry!(program_entry);
 default_alloc!();
 
 /// program entry
 fn program_entry() -> i8 {
-    drop(logger::init());
-
     // Call main function and return error code
     match entry::main() {
         Ok(_) => 0,

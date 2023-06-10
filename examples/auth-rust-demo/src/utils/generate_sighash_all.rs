@@ -1,5 +1,5 @@
-use crate::blake2b::new_blake2b;
 use crate::error::Error;
+use crate::utils::new_blake2b;
 use blake2b_rs::Blake2b;
 use ckb_std::ckb_constants::{InputField, Source};
 use ckb_std::high_level::load_tx_hash;
