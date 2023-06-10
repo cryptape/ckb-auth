@@ -711,5 +711,3 @@ fn abnormal_algorithm_type() {
         );
     }
 }
-
-
