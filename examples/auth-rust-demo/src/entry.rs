@@ -12,7 +12,7 @@ use core::result::Result;
 
 use crate::error::Error;
 
-use rust_ckb_auth::ckb_auth::{
+use ckb_auth_rs::ckb_auth::{
     ckb_auth, AuthAlgorithmIdType, CkbAuthType, CkbEntryType, EntryCategoryType,
 };
 

@@ -1,5 +1,5 @@
 use ckb_std::error::SysError;
-use rust_ckb_auth::ckb_auth::CkbAuthError;
+use ckb_auth_rs::ckb_auth::CkbAuthError;
 
 /// Error
 #[repr(i8)]
