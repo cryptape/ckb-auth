@@ -1,5 +1,11 @@
 # ckb-auth litecoin interoperability
+Below uses the address `msv9GiUuCGEaoWzu7YcPDJo8hu5ij3Nzjn` whose coresponding private key is
+`cSoKeLipWLXgdonv3pxE7XBp37yPVAnFcio3ZfGvsdjSWZa67cFJ`. See below on how to import this private
+key into the wallet.
+
+```
 export KEY="cSoKeLipWLXgdonv3pxE7XBp37yPVAnFcio3ZfGvsdjSWZa67cFJ" ADDRESS="msv9GiUuCGEaoWzu7YcPDJo8hu5ij3Nzjn"
+```
 
 Ckb-auth library is able to verify a lot of blockchain signatures including the litecoin.
 We can use `litecoin-cli` (or other compatible wallet) to generate valid signatures and validate them on-chain with ckb-auth.
@@ -41,6 +47,7 @@ ICbd+cH5vWtimef3mJZf0nwbR30Em1zTDQW7WGOJZ1aia2wwUL9DFJdO88P6ChF15mQmirb/525+V9u8
 ```
 cargo run --bin ckb-auth-cli -- -b litecoin verify -s ICbd+cH5vWtimef3mJZf0nwbR30Em1zTDQW7WGOJZ1aia2wwUL9DFJdO88P6ChF15mQmirb/525+V9u8BWVZY2E= --encoding base64 -p 88043d56e0079d30927ebf8bb99358d7ddad7ad8
 ```
+This commands return zero if and only if verification succeeded.
 
 # Signing a transaction with litecoin-cli
 

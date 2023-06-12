@@ -167,4 +167,5 @@ fn verify_signature(blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
         dbg!(result.unwrap_err());
         panic!("Verification failed");
     }
+    println!("Signature verification succeeded!");
 }
