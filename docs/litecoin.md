@@ -11,6 +11,8 @@ with `litecoin-cli`, and then leverage ckb-auth to check the validity of this si
 See [the docs](./auth.md) for more details.
 
 # Generate and verify transaction with ckb-auth-cli
+[`ckb-auth-cli`](../tests/auth_rust/src/bin/ckb-auth-cli.rs) is a command line utility to easy generate and verify ckb-auth transactions. Below assume that the working directory is `tests/auth_rust`.
+
 ## Get the pub key hash with `parse` sub command.
 ```
 cargo run --bin ckb-auth-cli -- -b litecoin parse -a msv9GiUuCGEaoWzu7YcPDJo8hu5ij3Nzjn
