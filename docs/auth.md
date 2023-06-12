@@ -132,9 +132,8 @@ typedef struct EntryType {
   the cell which contains the code binary
 * entry_category
 
-  The entry to the algorithm. Now there are 3 categories:
+  The entry to the algorithm. Now there are 2 categories:
   - dynamic library
-  - exec
   - spawn (activated after hardfork 2023)
 
 ### Entry Category: Dynamic Library
@@ -149,31 +148,22 @@ The first argument denotes the `algorithm_id` in `CkbAuthType` described above. 
 
 A valid dynamic library denoted by `EntryType` should provide `ckb_auth_validate` exported function.
 
-### Entry Category: Exec (Deprecated)
-It's deprecated, See [Deprecated Exec](#deprecated-exec).
-
-This category shares same arguments and behavior to dynamic library. It uses `exec` instead of `dynamic library`. When
-entry category is `exec`, it follows the rules described in [Ideas on chained
-locks](https://talk.nervos.org/t/ideas-on-chained-locks/5887) with update of arguments format:
+### Entry Category: Spawn
+This category shares same arguments and behavior to dynamic library. It uses `spawn` instead of `dynamic library`. When
+entry category is `spawn`, its arguments format is below:
 
 ```text
-<code hash>:<hash type>
-:<auth algorithm id 1>:<signature 1>:<message 1>:<pubkey hash 1>
-:<auth algorithm id 2>:<signature 2>:<message 2>:<pubkey hash 2>
-...
-:<auth algorithm id n>:<signature n>:<message n>:<pubkey hash n>
+<auth algorithm id>  <signature>  <message>  <pubkey hash>
+```
+They will be passed as `argv` in `spawn` syscall, in hex format. An example of arguments:
+```
+20 000000000000AA11 000000000000BB22 000000000000CC33
 ```
 
-The `auth algorithm id n` denotes the `algorithm_id` in `CkbAuthType` described above. The fields `signature` and
+The `auth algorithm id` denotes the `algorithm_id` in `CkbAuthType` described above. The fields `signature` and
 `pubkey_hash` are described in `key parameters` mentioned above.
 
 We can implement different auth algorithm ids in same code binary. 
-
-### Entry Category: Spawn
-This options is activated after hardfork 2023. It shares same arguments format of `Exec`. 
-
-Compared to `Exec`, there are no security issues with this method. After the
-syscall spawn call, the context is retained for greater convenience.
 
 
 ### High Level APIs
@@ -183,15 +173,3 @@ int ckb_auth(EntryType* entry, CkbAuthType *id, uint8_t *signature, uint32_t sig
 ```
 Most of developers only need to use this function without knowing the low level APIs.
 
-
-### Deprecated Exec
-
-All scripts invoked by `Exec` should be developed by trusted developers. If any
-script returns success earlier, it can break the entire validation process in
-`chained exec`.
-
-It is recommended to only utilize the "exec" function as the final step in
-scripts. Any early use of "`exec`" or “`ckb_exit`” can prematurely disrupt the
-`chained exec`.
-
-Therefore, we recommend using syscall `spawn` instead of `Exec`.
