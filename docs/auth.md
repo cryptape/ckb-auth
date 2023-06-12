@@ -183,7 +183,7 @@ Most of developers only need to use this function without knowing the low level 
 ### Rust High Level APIs
 Provide a Rust interface, you can directly call the related functions of ckb-auth in rust.
 
-Dependencies name: `rust-ckb-auth`
+Dependencies name: `ckb-auth-rs`
 
 #### API Description
 ``` rust
