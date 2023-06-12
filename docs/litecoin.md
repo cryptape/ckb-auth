@@ -10,6 +10,36 @@ including transaction hash and other witnesses in this input group)
 with `litecoin-cli`, and then leverage ckb-auth to check the validity of this signature.
 See [the docs](./auth.md) for more details.
 
+# Generate and verify transaction with ckb-auth-cli
+## Get the pub key hash with `parse` sub command.
+```
+cargo run --bin ckb-auth-cli -- -b litecoin parse -a msv9GiUuCGEaoWzu7YcPDJo8hu5ij3Nzjn
+```
+which outputs
+```
+88043d56e0079d30927ebf8bb99358d7ddad7ad8
+```
+## Get the message to sign with `generate` subcommand.
+```
+cargo run --bin ckb-auth-cli -- -b litecoin generate -a msv9GiUuCGEaoWzu7YcPDJo8hu5ij3Nzjn
+```
+which outputs
+```
+8fe9f62674d51f3103a3635433e73b4fcdadf6faa3b0c8392546ca6af161aa12
+```
+## Sign the message with litecoin-cli
+```
+litecoin-cli -rpcwallet=ckb-auth-test-wallet -testnet signmessage msv9GiUuCGEaoWzu7YcPDJo8hu5ij3Nzjn 8fe9f62674d51f3103a3635433e73b4fcdadf6faa3b0c8392546ca6af161aa12
+```
+which outputs
+```
+ICbd+cH5vWtimef3mJZf0nwbR30Em1zTDQW7WGOJZ1aia2wwUL9DFJdO88P6ChF15mQmirb/525+V9u8BWVZY2E=
+```
+## Verify the signature with `verify` subcommand
+```
+cargo run --bin ckb-auth-cli -- -b litecoin verify -s ICbd+cH5vWtimef3mJZf0nwbR30Em1zTDQW7WGOJZ1aia2wwUL9DFJdO88P6ChF15mQmirb/525+V9u8BWVZY2E= --encoding base64 -p 88043d56e0079d30927ebf8bb99358d7ddad7ad8
+```
+
 # Signing a transaction with litecoin-cli
 
 ## Downloading the litecoin binaries
