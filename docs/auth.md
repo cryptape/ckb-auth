@@ -132,7 +132,7 @@ typedef struct EntryType {
   the cell which contains the code binary
 * entry_category
 
-  The entry to the algorithm. Now there are 3 categories:
+  The entry to the algorithm. Now there are 2 categories:
   - dynamic library
   - spawn (activated after hardfork 2023)
 
