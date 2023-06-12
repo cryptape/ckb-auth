@@ -1,5 +1,5 @@
 [package]
-name = "auth-lock-test"
+name = "ckb-auth-rs"
 version = "0.1.0"
 authors = ["joii <joii@cryptape.com"]
 edition = "2018"
@@ -24,8 +24,7 @@ sha2 = "0.10.6"
 mbedtls = "0.8.1"
 bitcoin = "0.30.0"
 base64 = "0.21.0"
-
-[dev-dependencies]
+clap = "4.3.2"
 log = { version = "0.4.14", features = ["std"] }
 bincode = "1.3.3"
 serde = { version = "1.0.130", features = ["derive"] }
@@ -34,3 +33,8 @@ secp256k1 = { version = "0.22.1", features = ["rand-std", "recovery"] }
 dyn-clone = "1.0.4"
 tempdir = "0.3.7"
 which = "4.4.0"
+bs58 = "0.5.0"
+anyhow = "1.0.71"
+
+[[bin]]
+name = "ckb-auth-cli"

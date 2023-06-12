@@ -12,13 +12,12 @@ use rand::{thread_rng, Rng};
 use sha3::{digest::generic_array::typenum::private::IsEqualPrivate, Digest, Keccak256};
 use std::sync::Arc;
 
-use misc::{
+use crate::{
     assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
     gen_tx_with_grouped_args, sign_tx, AlgorithmType, Auth, AuthErrorCodeType, BitcoinAuth,
     CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader, EntryCategoryType, EosAuth,
     EthereumAuth, LitecoinAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
 };
-mod misc;
 
 fn verify_unit(config: &TestConfig) -> Result<u64, ckb_error::Error> {
     let mut data_loader = DummyDataLoader::new();
@@ -126,7 +125,7 @@ fn unit_test_faileds(auth: &Box<dyn Auth>, run_type: EntryCategoryType) {
     // sign size bigger
     {
         let mut config = TestConfig::new(&auth, run_type, 1);
-        config.incorrect_sign_size = misc::TestConfigIncorrectSing::Bigger;
+        config.incorrect_sign_size = crate::TestConfigIncorrectSing::Bigger;
         let mut config = TestConfig::new(&auth, run_type, 1);
         config.incorrect_sign = true;
         assert_result_error(
@@ -142,7 +141,7 @@ fn unit_test_faileds(auth: &Box<dyn Auth>, run_type: EntryCategoryType) {
     // sign size smaller
     {
         let mut config = TestConfig::new(&auth, run_type, 1);
-        config.incorrect_sign_size = misc::TestConfigIncorrectSing::Smaller;
+        config.incorrect_sign_size = crate::TestConfigIncorrectSing::Smaller;
         assert_result_error(
             verify_unit(&config),
             "sign size(smaller)",
@@ -210,7 +209,7 @@ fn bitcoin_verify() {
 
 #[test]
 fn bitcoin_uncompress_verify() {
-    let mut auth = misc::BitcoinAuth::new();
+    let mut auth = crate::BitcoinAuth::new();
     auth.compress = false;
     let auth: Box<dyn Auth> = auth;
     unit_test_common_with_auth(&auth, EntryCategoryType::DynamicLinking);
@@ -434,8 +433,8 @@ fn convert_btc_error() {
             temp2.put(Bytes::from(message_magic.to_vec()));
             temp2.put(Bytes::from(hex::encode(message)));
 
-            let msg = misc::calculate_sha256(&temp2);
-            let msg = misc::calculate_sha256(&msg);
+            let msg = crate::calculate_sha256(&temp2);
+            let msg = crate::calculate_sha256(&msg);
 
             H256::from(msg)
         }
@@ -480,8 +479,8 @@ fn convert_doge_error() {
             temp2.put(Bytes::from(message_magic.to_vec()));
             temp2.put(Bytes::from(hex::encode(message)));
 
-            let msg = misc::calculate_sha256(&temp2);
-            let msg = misc::calculate_sha256(&msg);
+            let msg = crate::calculate_sha256(&temp2);
+            let msg = crate::calculate_sha256(&msg);
 
             H256::from(msg)
         }
@@ -526,8 +525,8 @@ fn convert_lite_error() {
             temp2.put(Bytes::from(message_magic.to_vec()));
             temp2.put(Bytes::from(hex::encode(message)));
 
-            let msg = misc::calculate_sha256(&temp2);
-            let msg = misc::calculate_sha256(&msg);
+            let msg = crate::calculate_sha256(&temp2);
+            let msg = crate::calculate_sha256(&msg);
 
             H256::from(msg)
         }
@@ -602,7 +601,7 @@ fn unit_test_ckbmultisig(auth: &Box<dyn Auth>, run_type: EntryCategoryType) {
     // sign size bigger
     {
         let mut config = TestConfig::new(&auth, run_type, 1);
-        config.incorrect_sign_size = misc::TestConfigIncorrectSing::Bigger;
+        config.incorrect_sign_size = crate::TestConfigIncorrectSing::Bigger;
         let mut config = TestConfig::new(&auth, run_type, 1);
         config.incorrect_sign = true;
         assert_result_error(
@@ -615,7 +614,7 @@ fn unit_test_ckbmultisig(auth: &Box<dyn Auth>, run_type: EntryCategoryType) {
     // sign size smaller
     {
         let mut config = TestConfig::new(&auth, run_type, 1);
-        config.incorrect_sign_size = misc::TestConfigIncorrectSing::Smaller;
+        config.incorrect_sign_size = crate::TestConfigIncorrectSing::Smaller;
         assert_result_error(
             verify_unit(&config),
             "sign size(smaller)",
@@ -682,7 +681,7 @@ fn schnorr_verify() {
 fn abnormal_algorithm_type() {
     #[derive(Clone)]
     struct AbnormalAuth {}
-    impl misc::Auth for AbnormalAuth {
+    impl crate::Auth for AbnormalAuth {
         fn get_pub_key_hash(&self) -> Vec<u8> {
             [0; 20].to_vec()
         }
@@ -712,3 +711,5 @@ fn abnormal_algorithm_type() {
         );
     }
 }
+
+
