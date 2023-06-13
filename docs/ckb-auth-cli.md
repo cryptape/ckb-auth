@@ -27,9 +27,9 @@ blockchains.
 
 ## Verify the signature with `verify` subcommand
 ckb-auth-cli generate the same transaction and set the signature to the one generated above,
-and then it checks the validity of this transaction.
+and then it checks the validity of this transaction. This will return zero if and only if verification succeeded.
 
 # integrations
 ##  litecoin
-See [litecoin docs](./litecoin.md)).
+See [litecoin docs](./litecoin.md).
 
