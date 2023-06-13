@@ -63,23 +63,6 @@ pub fn calculate_sha256(buf: &[u8]) -> [u8; 32] {
     c.finalize().into()
 }
 
-#[derive(Clone, Copy)]
-pub enum AlgorithmType {
-    Ckb = 0,
-    Ethereum = 1,
-    Eos = 2,
-    Tron = 3,
-    Bitcoin = 4,
-    Dogecoin = 5,
-    CkbMultisig = 6,
-    SchnorrOrTaproot = 7,
-    RSA = 8,
-    Iso9796_2 = 9,
-    Litecoin = 10,
-    Cardano = 11,
-    OwnerLock = 0xFC,
-}
-
 #[derive(Default, Clone)]
 pub struct DummyDataLoader {
     pub cells: HashMap<OutPoint, (CellOutput, ckb_types::bytes::Bytes)>,
@@ -474,6 +457,22 @@ pub enum EntryCategoryType {
     DynamicLinking = 1,
 }
 
+#[derive(Clone, Copy)]
+pub enum AlgorithmType {
+    Ckb = 0,
+    Ethereum = 1,
+    Eos = 2,
+    Tron = 3,
+    Bitcoin = 4,
+    Dogecoin = 5,
+    CkbMultisig = 6,
+    SchnorrOrTaproot = 7,
+    RSA = 8,
+    Iso9796_2 = 9,
+    Litecoin = 10,
+    OwnerLock = 0xFC,
+}
+
 #[derive(PartialEq, Eq)]
 pub enum TestConfigIncorrectSing {
     None,
@@ -717,9 +716,6 @@ pub fn auth_builder(t: AlgorithmType, official: bool) -> result::Result<Box<dyn 
         AlgorithmType::Iso9796_2 => {}
         AlgorithmType::Litecoin => {
             return Ok(LitecoinAuth::new_official(official));
-        }
-        AlgorithmType::Cardano => {
-            panic!("unsupport cardano")
         }
         AlgorithmType::OwnerLock => {
             return Ok(OwnerLockAuth::new());
@@ -1509,3 +1505,7 @@ impl Auth for OwnerLockAuth {
         Bytes::from([0; 64].to_vec())
     }
 }
+
+
+
+

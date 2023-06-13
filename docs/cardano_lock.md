@@ -3,55 +3,6 @@
 ## About cardano lock
 [Cardano](https://cardano.org/) is a blockchain platform for changemakers, innovators, and visionaries, with the tools and technologies required to create possibility for the many, as well as the few, and bring about positive global change.
 
-## Quick Start
-
-The directory needs to jump to `tests/cardano_lock`
-
-### Install cardano-cli
-Download from the [official](https://github.com/input-output-hk/cardano-node/releases/tag/8.0.0).
-You can use --help to view more related commands. The relevant commands we used can be independent of the cardano-node (Cardano network).
-Also available [here](https://github.com/input-output-hk/cardano-wallet/releases/tag/v2023-04-14)
-
-
-```bash
-# Generate Key
-mkdir -p test_data
-./bin/cardano-cli node key-gen \
-    --cold-verification-key-file test_data/cold.vkey.json \
-    --cold-signing-key-file test_data/cold.skey.json \
-    --operational-certificate-issue-counter-file test_data/cold.counter.json
-
-# Get public key hash
-ckb-auth-cli cardano get-pubkey-hash <Public key>
-```
-The `test_data/cold.skey.json` is public key
-* Note: The first two bytes are CBOR encoded (`5820`), and the latter is the real data.
-* Note: The json file is in a fixed format. The data is stored in "cborHex".
-
-```bash
-# Signature
-message="0011223344556677889900112233445500112233445566778899001122334455"
-./bin/cardano-cli transaction build-raw \
-    --shelley-era \
-    --tx-in $message#0 \
-    --tx-out addr_test1vp2fg770ddmqxxduasjsas39l5wwvwa04nj8ud95fde7f7guscp6v+1 \
-    --invalid-hereafter 0 \
-    --fee 7 \
-    --out-file test_data/cardano_tx.json
-./bin/cardano-cli transaction sign \
-    --tx-body-file test_data/cardano_tx.json \
-    --signing-key-file test_data/cold.skey.json \
-    --mainnet \
-    --out-file test_data/cardano_tx.signed.json
-```
-The `test_data/cardano_tx.signed.json` is signature.
-
-```bash
-# Verify
-ckb-auth-cli cardano verify <Public key hash> $message <Sign>
-```
-* Note: Sign uses all data in *.signed.json 's `cborHex`
-
 
 ## Signature
 Signatures are structured using CBOR. In order to ensure compatibility with cadrano-cli and the security of transactions, some modifications have been made to the original structure here:
@@ -114,3 +65,8 @@ Afterwards, we will compare the message to see if it matches the one generated b
 
 ### Script and testcase
 The above-mentioned matters have all been included in the test cases. If you wish to understand the specific situation, you can refer to this file: ```tests/cardano_lock/Makefile``` and ```tests/cardano_lock/src/bin/gen_cardano_signature.sh```.
+
+## Install cardano-cli
+Download from the [official](https://github.com/input-output-hk/cardano-node/releases/tag/8.0.0).
+You can use --help to view more related commands. The relevant commands we used can be independent of the cardano-node (Cardano network).
+Also available [here](https://github.com/input-output-hk/cardano-wallet/releases/tag/v2023-04-14)
