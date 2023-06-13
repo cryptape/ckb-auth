@@ -1,4 +1,12 @@
-# ckb-auth-cli
+# Building ckb-auth-cli
+There are some required binaries that needs to be built in order to run [`ckb-auth-cli`](../tests/auth_rust/src/bin/ckb-auth-cli.rs).
+We can run the following shell script to do so.
+```bash
+cd ./tests/auth_rust/
+./run.sh
+```
+
+# Using ckb-auth-cli
 ckb-auth-cli is a command line utillity to faciliate the creation and verification of transaction
 with ckb-auth as lock script.
 
