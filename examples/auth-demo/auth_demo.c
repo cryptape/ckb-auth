@@ -1,4 +1,3 @@
-
 // a demo to use "auth" lib
 // script args: <21 bytes auth> <32 bytes code hash> <1 byte hash type> <1 byte
 // entry category> see `CkbEntryType`

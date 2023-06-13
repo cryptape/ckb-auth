@@ -1,8 +1,8 @@
-
 // clang-format off
 #include "mbedtls/md.h"
 #include "mbedtls/md_internal.h"
 #include "mbedtls/memory_buffer_alloc.h"
+#include "ed25519.h"
 
 // configuration for secp256k1
 #define ENABLE_MODULE_EXTRAKEYS
@@ -29,6 +29,8 @@
 #include "ckb_exec.h"
 #include "blake2b.h"
 // clang-format on
+
+#include "cardano/cardano_lock_inc.h"
 
 // secp256k1 also defines this macros
 #undef CHECK2
@@ -324,6 +326,41 @@ int validate_signature_schnorr(void *prefilled_data, const uint8_t *sig,
     *output_len = BLAKE160_SIZE;
 
     return 0;
+}
+
+int validate_signature_cardano(void *prefilled_data, const uint8_t *sig,
+                               size_t sig_len, const uint8_t *msg,
+                               size_t msg_len, uint8_t *output,
+                               size_t *output_len) {
+    int err = 0;
+
+    if (*output_len < BLAKE160_SIZE) {
+        return SECP256K1_PUBKEY_SIZE;
+    }
+
+    CardanoSignatureData cardano_data;
+    CHECK2(get_cardano_data(sig, sig_len, &cardano_data) == CardanoSuccess,
+           ERROR_INVALID_ARG);
+
+    CHECK2(memcmp(msg, cardano_data.ckb_sign_msg, msg_len) == 0,
+           ERROR_INVALID_ARG);
+
+    int suc = ed25519_verify(cardano_data.signature, cardano_data.sign_message,
+                             CARDANO_LOCK_SIGNATURE_MESSAGE_SIZE,
+                             cardano_data.public_key);
+    CHECK2(suc == 1, ERROR_EXEC_INVALID_SIG);
+
+    blake2b_state ctx;
+    uint8_t pubkey_hash[BLAKE2B_BLOCK_SIZE] = {0};
+    blake2b_init(&ctx, BLAKE2B_BLOCK_SIZE);
+    blake2b_update(&ctx, cardano_data.public_key,
+                   sizeof(cardano_data.public_key));
+    blake2b_final(&ctx, pubkey_hash, sizeof(pubkey_hash));
+
+    memcpy(output, pubkey_hash, BLAKE160_SIZE);
+    *output_len = BLAKE160_SIZE;
+exit:
+    return err;
 }
 
 int convert_copy(const uint8_t *msg, size_t msg_len, uint8_t *new_msg,
@@ -722,6 +759,10 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
     } else if (auth_algorithm_id == AuthAlgorithmIdSchnorr) {
         err = verify(pubkey_hash, signature, signature_size, message,
                      message_size, validate_signature_schnorr, convert_copy);
+        CHECK(err);
+    } else if (auth_algorithm_id == AuthAlgorithmIdCardano) {
+        err = verify(pubkey_hash, signature, signature_size, message,
+                     message_size, validate_signature_cardano, convert_copy);
         CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdOwnerLock) {
         CHECK2(is_lock_script_hash_present(pubkey_hash), ERROR_MISMATCHED);
