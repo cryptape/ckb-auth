@@ -1,115 +1,147 @@
-# Cardano Lock
-
-## About cardano lock
-[Cardano](https://cardano.org/) is a blockchain platform for changemakers, innovators, and visionaries, with the tools and technologies required to create possibility for the many, as well as the few, and bring about positive global change.
+# [Cardano Lock](https://cardano.org)
 
 ## Quick Start
 
-The directory needs to jump to `tests/cardano_lock`
-
-### Install cardano-cli
-Download from the [official](https://github.com/input-output-hk/cardano-node/releases/tag/8.0.0).
-You can use --help to view more related commands. The relevant commands we used can be independent of the cardano-node (Cardano network).
-Also available [here](https://github.com/input-output-hk/cardano-wallet/releases/tag/v2023-04-14)
-
-
+### Install Tools
+#### cardano-cli
+cardano-cli is an official tool provided by Cardano, which enables key management as well as transaction construction and signing. It can be installed using the command
 ```bash
-# Generate Key
-mkdir -p test_data
-./bin/cardano-cli node key-gen \
-    --cold-verification-key-file test_data/cold.vkey.json \
-    --cold-signing-key-file test_data/cold.skey.json \
-    --operational-certificate-issue-counter-file test_data/cold.counter.json
-
-# Get public key hash
-ckb-auth-cli cardano parse -x <Public key>
+cd tests/cardano_lock && make install_cardano_tools
 ```
-The `test_data/cold.skey.json` is public key
-* Note: The json file is in a fixed format. The data is stored in "cborHex".
+Or by downloading it from the [official](https://github.com/input-output-hk/cardano-node/releases/tag/8.0.0).
 
+#### ckb-auth-cli
+ckb-auth-cli is a tool designed to assist in testing ckb-auth. Its source code can be found in the 'tools/ckb-auth-cli' directory and can be compiled directly using:
 ```bash
-# Signature
+cargo build
+```
+
+
+### Generate key
+You can generate key files (including private and public keys) using the cardano-cli. The command to do so is as follows:
+```bash
+mkdir -p tests/cardano_lock/test_data
+tests/cardano_lock/bin/cardano-cli node key-gen \
+    --cold-verification-key-file tests/cardano_lock/test_data/cold.vkey.json \
+    --cold-signing-key-file tests/cardano_lock/test_data/cold.skey.json \
+    --operational-certificate-issue-counter-file tests/cardano_lock/test_data/cold.counter.json
+```
+The private key is stored in the `cold.skey.json` file, while the public key is stored in the `cold.vkey.json` file. These files are in JSON format, and the key is stored in `cborHex`. The hexadecimal data represents the key, with the actual key data following the "5820" prefix and being 32 bytes long.
+Afterward, you can obtain the hash of the public key for use with ckb-auth-cli. The public key needs to include all the data from the cborHex field in `cold.vkey.json` (the program will handle this data).
+```bash
+ckb-auth-cli cardano parse -x <Public key hex data>
+```
+
+
+### Signature
+To demonstrate the verification process, we will be using ckb-auth-cli, which directly calls ckb-auth. Therefore, we can use any 32-byte data as the signature message. Generate the transaction and sign it using the following command:
+```bash
 message="0011223344556677889900112233445500112233445566778899001122334455"
-./bin/cardano-cli transaction build-raw \
+tests/cardano_lock/bin/cardano-cli transaction build-raw \
     --shelley-era \
     --tx-in $message#0 \
     --tx-out addr_test1vp2fg770ddmqxxduasjsas39l5wwvwa04nj8ud95fde7f7guscp6v+1 \
     --invalid-hereafter 0 \
     --fee 7 \
-    --out-file test_data/cardano_tx.json
-./bin/cardano-cli transaction sign \
-    --tx-body-file test_data/cardano_tx.json \
-    --signing-key-file test_data/cold.skey.json \
+    --out-file tests/cardano_lock/test_data/cardano_tx.json
+tests/cardano_lock/bin/cardano-cli transaction sign \
+    --tx-body-file tests/cardano_lock/test_data/cardano_tx.json \
+    --signing-key-file tests/cardano_lock/test_data/cold.skey.json \
     --mainnet \
-    --out-file test_data/cardano_tx.signed.json
+    --out-file tests/cardano_lock/test_data/cardano_tx.signed.json
 ```
-The `test_data/cardano_tx.signed.json` is signature.
+Once the execution is complete, the signed data will be stored in `cardano_tx.signed.json`, following a format similar to that of a key. Later on, you can directly extract the `cborHex` from it for verification purposes.
 
+### Verify
+Here use ckb-auth-cli for verify
 ```bash
 # Verify
 ckb-auth-cli cardano verify -p <Public key hash> -m $message -s <Sign>
 ```
-* Note: Sign uses all data in *.signed.json 's `cborHex`
 
-
-## Signature
+### Signature
 Signatures are structured using CBOR. In order to ensure compatibility with cadrano-cli and the security of transactions, some modifications have been made to the original structure here:
 The transaction hash of the Input is passed into ```generate_sighash_all``` function in ckb-auth as a hash.
 
+| byte string | length | data |
+| ----------- | ------ | ---- |
+|          58 |     20 | d8e3a41c95c7ed8fd4213fd5def288605ed76db6ed63b1f19fb932b52479da3f |
 
-Specific signature process:
-### 1. Generate key
-```bash
-./bin/cardano-cli node key-gen \
-    --cold-verification-key-file test_data/cold.vkey.json \
-    --cold-signing-key-file test_data/cold.skey.json \
-    --operational-certificate-issue-counter-file test_data/cold.counter.json
+
+## Details of Cardano
+The previous section provided a simple verification of Cardano-related signatures. However, the tests/cardano_lock directory provides comprehensive tests. By running make all, you can execute the tests, which will build a complete CKB transaction and use the auth-demo contract for verification. The entire process is secure.
+
+### Some considerations regarding cardano-cli
+Here, it is mentioned that the files outputted by `cardano-cli` are in JSON format, as shown below:
+```json
+{
+    "type": "StakePoolSigningKey_ed25519",
+    "description": "Stake Pool Operator Signing Key",
+    "cborHex": "5820d8e3a41c95c7ed8fd4213fd5def288605ed76db6ed63b1f19fb932b52479da3f"
+}
 ```
-The cold.skey.json is for signature. And The cold.vkey.json is for verify.
-```cborHex``` in key.json stores the generated key, the binary is stored in the form of [CBOR](https://tools.ietf.org/html/rfc7049), and the actual key data is 2 to 34 bytes. (The following tx/signed are all in a similar format)
+The data is stored in the `cborHex` field using CBOR encoding. In the above example:
+|          58 |     20 | d8e3a41c95c7ed8fd4213fd5def288605ed76db6ed63b1f19fb932b52479da3f |
+| ----------- | ------ | ---- |
+| byte string | length | data |
 
 
-### 2. Generate Tx
+### Generating Keys
+
+`cardano-cli` can directly generate keys, and both the public and private keys can be obtained as hexadecimal data.
+
+### Signing
+
+`cardano-cli` can generate transactions and sign them. The data is divided into three parts: transaction details, signature-related data (public key and signature), and metadata. When signing, the transaction's relevant information is hashed (using blake2b 256), and the resulting 32-byte data is used as the signature message for signing. You can obtain the signature message using the following command:
 ```bash
-sign_hash=`./target/debug/get-sign-hash`
-.bin/cardano-cli transaction build-raw \
-    --shelley-era \
-    --tx-in $sign_hash#0 \
-    --tx-out addr_test1vp2fg770ddmqxxduasjsas39l5wwvwa04nj8ud95fde7f7guscp6v+1 \
-    --invalid-hereafter 0 \
-    --fee 7 \
-    --out-file test_data/cardano_tx.json
+./tests/cardano_lock/bin/cardano-cli transaction txid --tx-body-file tests/cardano_lock/test_data/cardano_tx.json
 ```
-Because Cardano's transaction information does not have a position similar to the sign-hash in CKB, and Cardano-cli verifies the transaction structure. Therefore, here we use the input's tx to store the sign-hash for signing. In CKB transactions, a unique hash is generated through sign-hash, and the data parameter is signed, so there shouldn't be significant security issues.
+Alternatively, you can use `cardano_tx.signed.json` since they contain the same transaction information, resulting in the same hash.
 
-### 3. Sign
+Since Cardano's transaction information does not have a suitable location to store the sign-message used to ensure the uniqueness of the CKB transaction, this data is placed in the input tx. You can parse the transaction information using the following command:
+```
+./tests/cardano_lock/bin/cardano-cli transaction view --tx-body-file tests/cardano_lock/test_data/cardano_tx.signed.json
+```
+It will produce an output similar to:
+```
+auxiliary scripts: null
+certificates: null
+collateral inputs: null
+era: Shelley
+fee: 7 Lovelace
+inputs:
+- 0011223344556677889900112233445500112233445566778899001122334455#0
+metadata: null
+mint: null
+outputs:
+- address: addr_test1vp2fg770ddmqxxduasjsas39l5wwvwa04nj8ud95fde7f7guscp6v
+  address era: Shelley
+  amount: 1 Lovelace
+  network: Testnet
+  payment credential key hash: 54947bcf6b760319bcec250ec225fd1ce63baface47e34b44b73e4f9
+  reference script: null
+  stake reference: null
+reference inputs: null
+required signers (payment key hashes needed for scripts): null
+return collateral: null
+total collateral: null
+update proposal: null
+validity range:
+  time to live: 0
+withdrawals: null
+```
+The `inputs` field stores the message for CKB transaction uniqueness.
+
+Finally, you can use the following command to decode the CBOR data and view the corresponding signature result:
 ```bash
-./bin/cardano-cli transaction sign \
-    --tx-body-file test_data/cardano_tx.json \
-    --signing-key-file test_data/cold.skey.json \
-    --mainnet \
-    --out-file test_data/cardano_tx.signed.json
+tests/cardano_lock/bin/cardano-cli text-view decode-cbor  --in-file tests/cardano_lock/test_data/cardano_tx.signed.json
 ```
-We sign directly with cardano-cli. You can see from the command that the previously generated private key is used and finally output to test_data/cardano_tx.signed.json.
-When signing in Cardano, the first part of the transaction is hashed using Blake2b 256, and the resulting output is used as the message for signing. (You can use the following command to get. )
-```bash
-bin/cardano-cli transaction  txid  --tx-body-file test_data/cardano_tx.json
-```
-Finally, it will be signed by ed25519.
 
-### 4. Build the transaction of auth-demo
-Get pubkey from cold.skey.json and witness from cardano_tx.signed.json. Same as ckb elsewhere.
+In `ckb-auth`, we will use the signed data as a complete witness for verification.
 
-### 5. ckb-auth verify
-First, extract the sign, pubkey, and message from the witness. The witness directly utilizes the signing result from cardano-cli, with data stored in CBOR format.
-Among these, the first map stores transaction information, the second map stores pubkey and sign, and the third one stores metadata (which is empty in this case). Here, we retrieve the message from the transaction information and obtain pubkey and sign from the second map.
-```bash
-# You can use these two commands to parse transaction information and cbor structure
-bin/cardano-cli transaction view --tx-body-file test_data/cardano_tx.signed.json
-bin/cardano-cli text-view decode-cbor  --in-file test_data/cardano_tx.signed.json
-```
-Afterwards, we will compare the message to see if it matches the one generated by the auth-demo script. And finally, we will perform ```ed25519_verify``` and compare the public key hash.
+### Verification
 
-
-### Script and testcase
-The above-mentioned matters have all been included in the test cases. If you wish to understand the specific situation, you can refer to this file: ```tests/cardano_lock/Makefile``` and ```tests/cardano_lock/src/bin/gen_cardano_signature.sh```.
+Using the successfully signed data and the public key, you can construct a CKB-auth transaction. During verification:
+First, the CBOR-formatted witness data needs to be parsed. This will provide the message, public key, and signature.
+Next, the message is checked to ensure that it matches the result computed by the contract, thus preventing transaction forgery.
+Finally, `ed25519_verify` is used to verify the signature. Additionally, the obtained public key is hashed and compared to the public key hash in the `args` field.
