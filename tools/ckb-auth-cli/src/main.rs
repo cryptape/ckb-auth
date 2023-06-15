@@ -1,84 +1,91 @@
 mod auth_script;
 mod cardano;
+mod litecoin;
 
-use clap::{arg, Command};
-use hex::decode;
+use cardano::CardanoLockArgs;
+use litecoin::LitecoinLockArgs;
 
-fn cli() -> Command {
-    Command::new("ckb-auth-cli")
-        .about("ckb auth client")
+use anyhow::{anyhow, Error};
+use clap::{ArgMatches, Command};
+
+trait BlockChainArgs {
+    fn block_chain_name(&self) -> &'static str;
+    fn reg_parse_args(&self, cmd: Command) -> Command;
+    fn reg_generate_args(&self, cmd: Command) -> Command;
+    fn reg_verify_args(&self, cmd: Command) -> Command;
+
+    fn get_block_chain(&self) -> Box<dyn BlockChain>;
+}
+
+trait BlockChain {
+    fn parse(&self, operate_mathches: &ArgMatches) -> Result<(), Error>;
+    fn generate(&self, operate_mathches: &ArgMatches) -> Result<(), Error>;
+    fn verify(&self, operate_mathches: &ArgMatches) -> Result<(), Error>;
+}
+
+fn cli(block_chain_args: &[Box<dyn BlockChainArgs>]) -> Command {
+    let mut cmd = Command::new("ckb-auth-cli")
+        .about("A command-line interface for CKB-Auth")
         .subcommand_required(true)
         .arg_required_else_help(true)
-        .allow_external_subcommands(true)
-        .subcommand(
-            Command::new("cardano")
-                .about("Cardano Lock")
+        .allow_external_subcommands(true);
+
+    for block_chain in block_chain_args {
+        cmd = cmd.subcommand(
+            Command::new(block_chain.block_chain_name())
+                .arg_required_else_help(true)
                 .subcommand(
-                    Command::new("get-pubkey-hash")
-                        .arg(arg!([PUBKEY]))
-                        .arg_required_else_help(true),
+                    block_chain.reg_parse_args(
+                        Command::new("parse")
+                            .about("Parse an address and obtain the pubkey hash")
+                            .arg_required_else_help(true),
+                    ),
                 )
                 .subcommand(
-                    Command::new("verify")
-                        .arg(arg!([PUBKEY]))
-                        .arg(arg!([MESSAGE]))
-                        .arg(arg!([SIGN]))
-                        .arg_required_else_help(true),
+                    block_chain.reg_generate_args(
+                        Command::new("generate")
+                            .about("Parse an address and obtain the pubkey hash")
+                            .arg_required_else_help(true),
+                    ),
                 )
-                .arg_required_else_help(true),
-        )
+                .subcommand(
+                    block_chain.reg_verify_args(
+                        Command::new("verify")
+                            .about("Verify a signature")
+                            .arg_required_else_help(true),
+                    ),
+                ),
+        );
+    }
+
+    cmd
 }
 
-fn print_pubkey_hash(pubkey: &[u8]) {
-    let pubkey_hash = ckb_hash::blake2b_256(pubkey);
-    println!("pubkey hash: {}", hex::encode(&pubkey_hash[0..20]));
-}
+// fn print_pubkey_hash(pubkey: &[u8]) {
+//     let pubkey_hash = ckb_hash::blake2b_256(pubkey);
+//     println!("pubkey hash: {}", hex::encode(&pubkey_hash[0..20]));
+// }
 
-fn main() {
-    let matches = cli().get_matches();
+fn main() -> Result<(), Error> {
+    let block_chain_args = [
+        Box::new(LitecoinLockArgs {}) as Box<dyn BlockChainArgs>,
+        Box::new(CardanoLockArgs {}) as Box<dyn BlockChainArgs>,
+    ];
 
-    let sub_cmd = matches.subcommand();
+    let matches = cli(block_chain_args.as_slice()).get_matches();
 
-    match sub_cmd {
-        Some(("cardano", sub_matches)) => {
-            let sub_command = sub_matches.subcommand();
-            match sub_command {
-                Some(("get-pubkey-hash", sub_matches)) => {
-                    let pubkey = decode(
-                        sub_matches
-                            .get_one::<String>("PUBKEY")
-                            .expect("Get pubkey hash"),
-                    )
-                    .expect("decode pubkey hash");
+    let (block_chain_name, sub_matches) = matches.subcommand().expect("get subcommand");
 
-                    print_pubkey_hash(&pubkey);
-                }
-                Some(("verify", sub_matches)) => {
-                    let pubkey = decode(
-                        sub_matches
-                            .get_one::<String>("PUBKEY")
-                            .expect("Get pubkey hash"),
-                    )
-                    .expect("decode pubkey hash");
+    let subcommand = block_chain_args
+        .iter()
+        .find(|f| f.block_chain_name() == block_chain_name)
+        .expect("unsupported subcommand")
+        .get_block_chain();
 
-                    let message = decode(
-                        sub_matches
-                            .get_one::<String>("MESSAGE")
-                            .expect("Get Message"),
-                    )
-                    .expect("decode message");
-
-                    let sign = decode(sub_matches.get_one::<String>("SIGN").expect("Get sign"))
-                        .expect("decode sign");
-                    cardano::cardano_verify(&pubkey, &message, &sign);
-                }
-                _ => {
-                    panic!("unsupport cardano subcommand")
-                }
-            }
-        }
-        _ => {
-            panic!("unsupport subcommand")
-        }
+    match sub_matches.subcommand() {
+        Some(("parse", operate_mathches)) => subcommand.parse(operate_mathches),
+        Some(("generate", operate_mathches)) => subcommand.generate(operate_mathches),
+        Some(("verify", operate_mathches)) => subcommand.verify(operate_mathches),
+        _ => return Err(anyhow!("unsupported operate")),
     }
 }

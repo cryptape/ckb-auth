@@ -22,10 +22,9 @@ mkdir -p test_data
     --operational-certificate-issue-counter-file test_data/cold.counter.json
 
 # Get public key hash
-ckb-auth-cli cardano get-pubkey-hash <Public key>
+ckb-auth-cli cardano parse -x <Public key>
 ```
 The `test_data/cold.skey.json` is public key
-* Note: The first two bytes are CBOR encoded (`5820`), and the latter is the real data.
 * Note: The json file is in a fixed format. The data is stored in "cborHex".
 
 ```bash
@@ -48,7 +47,7 @@ The `test_data/cardano_tx.signed.json` is signature.
 
 ```bash
 # Verify
-ckb-auth-cli cardano verify <Public key hash> $message <Sign>
+ckb-auth-cli cardano verify -p <Public key hash> -m $message -s <Sign>
 ```
 * Note: Sign uses all data in *.signed.json 's `cborHex`
 
