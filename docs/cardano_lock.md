@@ -31,7 +31,10 @@ Afterward, you can obtain the hash of the public key for use with ckb-auth-cli. 
 ```bash
 ckb-auth-cli cardano parse -x <Public key hex data>
 ```
-
+You can also pass in the key file:
+```bash
+ckb-auth-cli cardano parse --vkey tests/cardano_lock/test_data/cold.vkey.json
+```
 
 ### Signature
 To demonstrate the verification process, we will be using ckb-auth-cli, which directly calls ckb-auth. Therefore, we can use any 32-byte data as the signature message. Generate the transaction and sign it using the following command:
@@ -58,9 +61,13 @@ Here use ckb-auth-cli for verify
 # Verify
 ckb-auth-cli cardano verify -p <Public key hash> -m $message -s <Sign>
 ```
+You can also pass in the signed file:
+```bash
+ckb-auth-cli cardano verify -p <Public key hash> -m $message --signature_file tests/cardano_lock/test_data/cardano_tx.signed.json
+```
 
 ### Signature
-Signatures are structured using CBOR. In order to ensure compatibility with cadrano-cli and the security of transactions, some modifications have been made to the original structure here:
+Signatures are structured using [CBOR](https://datatracker.ietf.org/doc/html/rfc7049). In order to ensure compatibility with cadrano-cli and the security of transactions, some modifications have been made to the original structure here:
 The transaction hash of the Input is passed into ```generate_sighash_all``` function in ckb-auth as a hash.
 
 | byte string | length | data |
