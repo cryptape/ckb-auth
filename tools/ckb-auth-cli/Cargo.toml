@@ -18,3 +18,4 @@ bs58 = "0.5.0"
 anyhow = "1.0.71"
 base64 = "0.21.0"
 serde_json = "1.0"
+monero = { version = "0.18.2", features = ["serde"] }
