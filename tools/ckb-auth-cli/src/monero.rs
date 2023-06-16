@@ -13,6 +13,9 @@ use core::str::FromStr;
 use hex::encode;
 use monero_rs::Address;
 use std::sync::Arc;
+use ckb_types::{
+    bytes::{BufMut, BytesMut},
+};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum MoneroMode {
@@ -50,7 +53,11 @@ impl BlockChainArgs for MoneroLockArgs {
     }
     fn reg_verify_args(&self, cmd: Command) -> Command {
         cmd.arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash verify against"))
-            .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to verify against"))
+            .arg(
+                arg!(-m --mode <MODE> "The mode to sign transactions (must be spend or view)")
+                    .required(false),
+            )
+            .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to include in the message"))
             .arg(arg!(-s --signature <SIGNATURE> "The signature to verify"))
     }
 
@@ -126,7 +133,32 @@ impl BlockChain for MoneroLock {
             .expect("get verify signature");
 
         let signature: Vec<u8> = decode_string(signature, "base64")?;
+        dbg!(hex::encode(&signature));
 
+        let address = operate_matches
+            .get_one::<String>("address")
+            .expect("get parse address");
+
+        let address: Address = FromStr::from_str(address)?;
+
+        let mode = operate_matches
+            .get_one::<String>("mode")
+            .map(String::as_str)
+            .unwrap_or("spend");
+
+        let mode: MoneroMode = FromStr::from_str(mode)?;
+        let pub_key_info = MoneroAuth::get_pub_key_info(
+            &address.public_spend,
+            &address.public_view,
+            mode == MoneroMode::Spend,
+        );
+        dbg!(hex::encode(&pub_key_info));
+        let mut data = BytesMut::with_capacity(signature.len() + pub_key_info.len());
+        data.put(signature.as_slice());
+        data.put(pub_key_info.as_slice());
+        let signature = data.freeze();
+
+        dbg!(hex::encode(&signature));
         let algorithm_type = AlgorithmType::Monero;
         let run_type = EntryCategoryType::Exec;
         let auth = auth_builder(algorithm_type, false).unwrap();

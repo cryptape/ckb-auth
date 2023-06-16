@@ -1302,7 +1302,10 @@ impl MoneroAuth {
     pub fn get_address(&self) -> String {
         monero::Address::from_keypair(self.network, &self.key_pair).to_string()
     }
-    pub fn get_pub_key_hash(
+    pub fn is_using_spend_key(&self) -> bool {
+        self.mode == 0
+    }
+    pub fn get_pub_key_info(
         public_spend: &monero::PublicKey,
         public_view: &monero::PublicKey,
         use_spend_key: bool,
@@ -1312,8 +1315,26 @@ impl MoneroAuth {
         buff.put_u8(mode);
         buff.put(public_spend.as_bytes());
         buff.put(public_view.as_bytes());
-        let bytes = buff.freeze();
-        Vec::from(&ckb_hash::blake2b_256(bytes)[..20])
+        buff.freeze().into()
+    }
+    fn serialize_pub_key_info(&self) -> Vec<u8> {
+        let public_spend = monero::PublicKey::from_private_key(&self.key_pair.spend);
+        let public_view = monero::PublicKey::from_private_key(&self.key_pair.view);
+        let use_spend_key = self.mode == 0;
+        Self::get_pub_key_info(&public_spend, &public_view, use_spend_key)
+    }
+    pub fn get_pub_key_hash(
+        public_spend: &monero::PublicKey,
+        public_view: &monero::PublicKey,
+        use_spend_key: bool,
+    ) -> Vec<u8> {
+        Vec::from(
+            &ckb_hash::blake2b_256(Self::get_pub_key_info(
+                public_spend,
+                public_view,
+                use_spend_key,
+            ))[..20],
+        )
     }
 }
 impl Auth for MoneroAuth {
@@ -1364,15 +1385,11 @@ impl Auth for MoneroAuth {
         let signature = base58_monero::decode(&signature[5..]).unwrap();
         assert_eq!(signature.len(), 64);
 
-        let mut data = BytesMut::with_capacity(signature.len() + 65);
+        let pub_key_info = self.serialize_pub_key_info();
+
+        let mut data = BytesMut::with_capacity(signature.len() + pub_key_info.len());
         data.put(signature.as_slice());
-        data.put_u8(self.mode);
-        let spend_pubkey = monero::PublicKey::from_private_key(&self.key_pair.spend);
-        let spend_pubkey = spend_pubkey.as_bytes();
-        data.put(spend_pubkey);
-        let view_pubkey = monero::PublicKey::from_private_key(&self.key_pair.view);
-        let view_pubkey = view_pubkey.as_bytes();
-        data.put(view_pubkey);
+        data.put(pub_key_info.as_slice());
         let bytes = data.freeze();
         bytes
     }
