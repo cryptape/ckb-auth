@@ -1,4 +1,4 @@
-# [Cardano Lock](https://cardano.org)
+# [Cardano Lock](../README.md)
 
 ## Quick Start
 
@@ -16,7 +16,6 @@ ckb-auth-cli is a tool designed to assist in testing ckb-auth. Its source code c
 cargo build
 ```
 
-
 ### Generate key
 You can generate key files (including private and public keys) using the cardano-cli. The command to do so is as follows:
 ```bash
@@ -28,10 +27,6 @@ tests/cardano_lock/bin/cardano-cli node key-gen \
 ```
 The private key is stored in the `cold.skey.json` file, while the public key is stored in the `cold.vkey.json` file. These files are in JSON format, and the key is stored in `cborHex`. The hexadecimal data represents the key, with the actual key data following the "5820" prefix and being 32 bytes long.
 Afterward, you can obtain the hash of the public key for use with ckb-auth-cli. The public key needs to include all the data from the cborHex field in `cold.vkey.json` (the program will handle this data).
-```bash
-ckb-auth-cli cardano parse -x <Public key hex data>
-```
-You can also pass in the key file:
 ```bash
 ckb-auth-cli cardano parse --vkey tests/cardano_lock/test_data/cold.vkey.json
 ```
@@ -58,11 +53,6 @@ Once the execution is complete, the signed data will be stored in `cardano_tx.si
 ### Verify
 Here use ckb-auth-cli for verify
 ```bash
-# Verify
-ckb-auth-cli cardano verify -p <Public key hash> -m $message -s <Sign>
-```
-You can also pass in the signed file:
-```bash
 ckb-auth-cli cardano verify -p <Public key hash> -m $message --signature_file tests/cardano_lock/test_data/cardano_tx.signed.json
 ```
 
@@ -76,7 +66,7 @@ The transaction hash of the Input is passed into ```generate_sighash_all``` func
 
 
 ## Details of Cardano
-The previous section provided a simple verification of Cardano-related signatures. However, the tests/cardano_lock directory provides comprehensive tests. By running make all, you can execute the tests, which will build a complete CKB transaction and use the auth-demo contract for verification. The entire process is secure.
+The previous section provided a simple verification of Cardano-related signatures. However, the `tests/cardano_lock` directory provides comprehensive tests. By running [`make all`](../tests/cardano_lock/Makefile), you can execute the tests, which will build a complete CKB transaction and use the auth-demo contract for verification. The entire process is secure.
 
 ### Some considerations regarding cardano-cli
 Here, it is mentioned that the files outputted by `cardano-cli` are in JSON format, as shown below:
@@ -146,7 +136,7 @@ tests/cardano_lock/bin/cardano-cli text-view decode-cbor  --in-file tests/cardan
 
 In `ckb-auth`, we will use the signed data as a complete witness for verification.
 
-### Verification
+### [Verification](../c/auth.c#331)
 
 Using the successfully signed data and the public key, you can construct a CKB-auth transaction. During verification:
 First, the CBOR-formatted witness data needs to be parsed. This will provide the message, public key, and signature.
