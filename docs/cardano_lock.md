@@ -136,7 +136,7 @@ tests/cardano_lock/bin/cardano-cli text-view decode-cbor  --in-file tests/cardan
 
 In `ckb-auth`, we will use the signed data as a complete witness for verification.
 
-### [Verification](../c/auth.c#331)
+### [Verification](../c/auth.c#L331)
 
 Using the successfully signed data and the public key, you can construct a CKB-auth transaction. During verification:
 First, the CBOR-formatted witness data needs to be parsed. This will provide the message, public key, and signature.
