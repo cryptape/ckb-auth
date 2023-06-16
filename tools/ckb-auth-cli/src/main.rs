@@ -2,6 +2,7 @@ mod auth_script;
 mod cardano;
 mod litecoin;
 mod monero;
+mod utils;
 
 use crate::monero::MoneroLockArgs;
 use cardano::CardanoLockArgs;

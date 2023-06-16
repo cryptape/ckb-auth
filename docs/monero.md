@@ -9,6 +9,45 @@ including transaction hash and other witnesses in this input group)
 with `monero-wallet-cli`, and then leverage ckb-auth to check the validity of this signature.
 See [the docs](./auth.md) for more details.
 
+# Generate and verify transaction with ckb-auth-cli
+
+## Get the pub key hash with `parse` sub command.
+Here the argument given to `-a` is the address of monero account, while the argument given to `-m` refers to
+whether the spend key or view key is used to sign the transaction.
+```
+ckb-auth-cli monero parse -a 41eBLjYsK28CJD5z2b7FojMCDg6vERASShVZqAvnsC9LhS7saG8CmMo5Rm92wgnT8wa6nJVu57MHHjmnoyvTpCG7NQ7dErc -m spend
+```
+which outputs
+```
+a55ec8bb5b93aaffefd754996cb097228839aad6
+```
+## Get the message to sign with `generate` subcommand.
+```
+ckb-auth-cli monero generate -p a55ec8bb5b93aaffefd754996cb097228839aad6
+```
+which outputs the message to sign
+```
+157ea09579f09cf96307f6b23d6fd61c3cff123076d44c27e2e9bedf02135e87
+```
+## Sign the message with litecoin-cli
+Following the steps below to set up a monero wallet, save above message to a binary file,
+e.g. running `printf "$(printf 157ea09579f09cf96307f6b23d6fd61c3cff123076d44c27e2e9bedf02135e87 | fold -w 2 | xargs -n 1 printf '\\x%s')" > ckb-auth-test-message`
+to save it to `ckb-auth-test-message`. To sign this message, finally run
+```
+monero-wallet-cli --wallet-file ckb-auth-test-wallet --password pw sign ckb-auth-test-message
+```
+which outputs
+```
+SigV23ZKheximq145tW14dshL17Jpqp2GJn296GfRnGqt3pMeaZU7xoEEAFr2Xm7Jc7xZjYWf6KhstZanA73to7uF6rea
+```
+Stripping prefix `SigV2`, this is the base64-encoded signature.
+
+## Verify the signature with `verify` subcommand
+```
+ckb-auth-cli monero verify -p a55ec8bb5b93aaffefd754996cb097228839aad6 -s 3ZKheximq145tW14dshL17Jpqp2GJn296GfRnGqt3pMeaZU7xoEEAFr2Xm7Jc7xZjYWf6KhstZanA73to7uF6rea`
+```
+This commands return zero if and only if verification succeeded.
+
 # Signing a transaction with monero-wallet-cli
 ## Downloading the monero binaries
 The commands below download the official `monero` binaries (e.g. `monerod` for monero daemon,

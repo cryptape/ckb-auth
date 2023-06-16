@@ -1,6 +1,6 @@
 extern crate monero as monero_rs;
 
-use super::{BlockChain, BlockChainArgs};
+use super::{utils::decode_string, BlockChain, BlockChainArgs};
 use anyhow::{anyhow, Error};
 use ckb_auth_rs::{
     auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash, get_message_to_sign,
@@ -10,7 +10,7 @@ use ckb_auth_rs::{
 use ckb_script::TransactionScriptsVerifier;
 use clap::{arg, ArgMatches, Command};
 use core::str::FromStr;
-use hex::{decode, encode};
+use hex::encode;
 use monero_rs::Address;
 use std::sync::Arc;
 
@@ -49,10 +49,9 @@ impl BlockChainArgs for MoneroLockArgs {
         cmd.arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to include in the message"))
     }
     fn reg_verify_args(&self, cmd: Command) -> Command {
-        cmd .arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash verify against"))
-      .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to verify against"))
-      .arg(arg!(-s --signature <SIGNATURE> "The signature to verify"))
-      .arg(arg!(-e --encoding <ENCODING> "The encoding of the signature (must be hex or base64)"))
+        cmd.arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash verify against"))
+            .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to verify against"))
+            .arg(arg!(-s --signature <SIGNATURE> "The signature to verify"))
     }
 
     fn get_block_chain(&self) -> Box<dyn BlockChain> {
@@ -63,14 +62,14 @@ impl BlockChainArgs for MoneroLockArgs {
 pub struct MoneroLock {}
 
 impl BlockChain for MoneroLock {
-    fn parse(&self, operate_mathches: &ArgMatches) -> Result<(), Error> {
-        let address = operate_mathches
+    fn parse(&self, operate_matches: &ArgMatches) -> Result<(), Error> {
+        let address = operate_matches
             .get_one::<String>("address")
             .expect("get parse address");
 
         let address: Address = FromStr::from_str(address)?;
 
-        let mode = operate_mathches
+        let mode = operate_matches
             .get_one::<String>("mode")
             .map(String::as_str)
             .unwrap_or("spend");
@@ -87,8 +86,14 @@ impl BlockChain for MoneroLock {
         Ok(())
     }
 
-    fn generate(&self, operate_mathches: &ArgMatches) -> Result<(), Error> {
-        let pubkey_hash = get_pubkey_hash_by_args(operate_mathches)?;
+    fn generate(&self, operate_matches: &ArgMatches) -> Result<(), Error> {
+        let pubkey_hash = operate_matches
+            .get_one::<String>("pubkeyhash")
+            .expect("Must get pubkeyhash");
+        let pubkey_hash: [u8; 20] = decode_string(pubkey_hash, "hex")
+            .expect("decode pubkey")
+            .try_into()
+            .unwrap();
 
         let run_type = EntryCategoryType::Exec;
         // Note that we must set the official parameter of auth_builder to be true here.
@@ -107,18 +112,20 @@ impl BlockChain for MoneroLock {
         Ok(())
     }
 
-    fn verify(&self, operate_mathches: &ArgMatches) -> Result<(), Error> {
-        let pubkey_hash = get_pubkey_hash_by_args(operate_mathches)?;
+    fn verify(&self, operate_matches: &ArgMatches) -> Result<(), Error> {
+        let pubkey_hash = operate_matches
+            .get_one::<String>("pubkeyhash")
+            .expect("Must get pubkeyhash");
+        let pubkey_hash: [u8; 20] = decode_string(pubkey_hash, "hex")
+            .expect("decode pubkey")
+            .try_into()
+            .unwrap();
 
-        let signature = operate_mathches
+        let signature = operate_matches
             .get_one::<String>("signature")
             .expect("get verify signature");
 
-        let encoding = operate_mathches
-            .get_one::<String>("encoding")
-            .expect("get verify encoding");
-
-        let signature: Vec<u8> = decode_string(signature, encoding)?;
+        let signature: Vec<u8> = decode_string(signature, "base64")?;
 
         let algorithm_type = AlgorithmType::Monero;
         let run_type = EntryCategoryType::Exec;
@@ -141,41 +148,5 @@ impl BlockChain for MoneroLock {
         println!("Signature verification succeeded!");
 
         Ok(())
-    }
-}
-
-fn get_pubkey_hash_by_args(sub_matches: &ArgMatches) -> Result<[u8; 20], Error> {
-    let pubkey_hash: Option<&String> = sub_matches.get_one::<String>("pubkeyhash");
-    let pubkey_hash: [u8; 20] = if pubkey_hash.is_some() {
-        decode(pubkey_hash.unwrap())
-            .expect("decode pubkey")
-            .try_into()
-            .unwrap()
-    } else {
-        let address = sub_matches
-            .get_one::<String>("address")
-            .expect("get generate address");
-        get_pub_key_hash_from_address(address)?
-            .try_into()
-            .expect("address buf to [u8; 20]")
-    };
-
-    Ok(pubkey_hash)
-}
-
-fn get_pub_key_hash_from_address(address: &str) -> Result<Vec<u8>, Error> {
-    // base58 -d <<< mhknqLHQGWDXuLsPdzab8nA4jD3fMdVYS2 | xxd -s 1 -l 20 -p
-    let bytes = bs58::decode(&address).into_vec()?;
-    return Ok(bytes[1..21].into());
-}
-
-fn decode_string(s: &str, encoding: &str) -> Result<Vec<u8>, Error> {
-    match encoding {
-        "hex" => Ok(hex::decode(s)?),
-        "base64" => {
-            use base64::{engine::general_purpose, Engine as _};
-            Ok(general_purpose::STANDARD.decode(s)?)
-        }
-        _ => Err(anyhow!("Unknown encoding {}", encoding)),
     }
 }
