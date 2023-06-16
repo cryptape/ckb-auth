@@ -13,6 +13,7 @@ impl BlockChainArgs for CardanoLockArgs {
 
     fn reg_parse_args(&self, cmd: Command) -> Command {
         cmd.arg(arg!(-x --hex <HEX> "The public key hex"))
+            .arg(arg!(--vkey <VKEY> "The pubkey file output by cardano-cli"))
     }
     fn reg_generate_args(&self, cmd: Command) -> Command {
         cmd
@@ -20,6 +21,7 @@ impl BlockChainArgs for CardanoLockArgs {
     fn reg_verify_args(&self, cmd: Command) -> Command {
         cmd.arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to verify against"))
             .arg(arg!(-s --signature <SIGNATURE> "The signature to verify"))
+            .arg(arg!(--signature_file <SIGNATUREFILE> "The signature file output by cardano-cli"))
             .arg(arg!(-m --message <MESSAGE> "The signature message"))
     }
 
@@ -32,12 +34,16 @@ pub struct CardanoLock {}
 
 impl BlockChain for CardanoLock {
     fn parse(&self, operate_mathches: &ArgMatches) -> Result<(), Error> {
-        let pubkey = decode(
-            operate_mathches
-                .get_one::<String>("hex")
-                .expect("get cardano public key"),
-        )
-        .expect("decode");
+        let pubkey = operate_mathches.get_one::<String>("hex");
+
+        let pubkey = if pubkey.is_some() {
+            decode(pubkey.unwrap()).expect("decode")
+        } else {
+            let pubkey_file = operate_mathches
+                .get_one::<String>("vkey")
+                .expect("get pubkey file");
+            get_data_by_cddl(&pubkey_file)
+        };
 
         let pubkey_hash = ckb_hash::blake2b_256(&pubkey[2..]);
         println!("{}", hex::encode(&pubkey_hash[0..20]));
@@ -57,12 +63,16 @@ impl BlockChain for CardanoLock {
         )
         .expect("decode pubkey hash");
 
-        let signature = decode(
-            operate_mathches
-                .get_one::<String>("signature")
-                .expect("get cardano signauthe"),
-        )
-        .expect("decode signature data");
+        let signature = operate_mathches.get_one::<String>("signature");
+
+        let signature = if signature.is_some() {
+            decode(signature.unwrap()).expect("decode signature data")
+        } else {
+            let signature_file = operate_mathches
+                .get_one::<String>("signature_file")
+                .expect("get cardano signauthe file");
+            get_data_by_cddl(&signature_file)
+        };
 
         let message = decode(
             operate_mathches
@@ -88,4 +98,16 @@ pub fn cardano_verify(pubkey_hash: &[u8], message: &[u8], sign: &[u8]) -> Result
     }
 
     super::auth_script::run_auth_exec(AlgorithmType::Cardano, pubkey_hash, message, sign)
+}
+
+fn get_data_by_cddl(path: &str) -> Vec<u8> {
+    let data = std::fs::read(path).expect("read cddl file");
+    let v: serde_json::Value = serde_json::from_slice(&data).unwrap();
+
+    let mut raw_data = v.get("cborHex").unwrap().to_string();
+    if raw_data.as_bytes()[0] == '\"' as u8 {
+        raw_data = String::from(&raw_data[1..raw_data.len() - 1]);
+    }
+
+    decode(raw_data).expect("decode cddl hex")
 }

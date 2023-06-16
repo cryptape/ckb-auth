@@ -32,3 +32,4 @@ cd tests/auth_spawn_rust && make all
 ## Integration
 If you want to integrate `ckb-auth` into real world projects, we have some tutorials:
 - [litecoin](./docs/litecoin.md)
+- [cardano](./docs/cardano_lock.md)
