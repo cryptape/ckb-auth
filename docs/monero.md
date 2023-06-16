@@ -44,7 +44,8 @@ Stripping prefix `SigV2`, this is the base64-encoded signature.
 
 ## Verify the signature with `verify` subcommand
 ```
-ckb-auth-cli monero verify -p a55ec8bb5b93aaffefd754996cb097228839aad6 -s 3ZKheximq145tW14dshL17Jpqp2GJn296GfRnGqt3pMeaZU7xoEEAFr2Xm7Jc7xZjYWf6KhstZanA73to7uF6rea`
+ckb-auth-cli monero verify -p a55ec8bb5b93aaffefd754996cb097228839aad6 -s 3ZKheximq145tW14dshL17Jpqp2GJn296GfRnGqt3pMeaZU7xoEEAFr2Xm7Jc7xZjYWf6KhstZanA73to7uF6rea -a 41eBLjYsK28CJD5z2b7FojMCDg6vERASShVZqAvnsC9LhS7saG8CmMo5Rm92wgnT8wa6nJVu57MHHjmnoyvTpCG7NQ7dErc -m spend
+-p a55ec8bb5b93aaffefd754996cb097228839aad6 -s 3ZKheximq145tW14dshL17Jpqp2GJn296GfRnGqt3pMeaZU7xoEEAFr2Xm7Jc7xZjYWf6KhstZanA73to7uF6rea
 ```
 This commands return zero if and only if verification succeeded.
 

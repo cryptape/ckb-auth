@@ -132,8 +132,7 @@ impl BlockChain for MoneroLock {
             .get_one::<String>("signature")
             .expect("get verify signature");
 
-        let signature: Vec<u8> = decode_string(signature, "base64")?;
-        dbg!(hex::encode(&signature));
+        let signature: Vec<u8> = decode_string(signature, "base58_monero")?;
 
         let address = operate_matches
             .get_one::<String>("address")
@@ -152,13 +151,11 @@ impl BlockChain for MoneroLock {
             &address.public_view,
             mode == MoneroMode::Spend,
         );
-        dbg!(hex::encode(&pub_key_info));
         let mut data = BytesMut::with_capacity(signature.len() + pub_key_info.len());
         data.put(signature.as_slice());
         data.put(pub_key_info.as_slice());
         let signature = data.freeze();
 
-        dbg!(hex::encode(&signature));
         let algorithm_type = AlgorithmType::Monero;
         let run_type = EntryCategoryType::Exec;
         let auth = auth_builder(algorithm_type, false).unwrap();
