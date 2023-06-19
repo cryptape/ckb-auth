@@ -1,11 +1,7 @@
 use ckb_auth_rs::{
-    auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash, get_message_to_sign,
+    auth_builder, gen_tx_scripts_verifier, gen_tx_with_pub_key_hash, get_message_to_sign,
     set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
 };
-
-use ckb_script::TransactionScriptsVerifier;
-
-use std::sync::Arc;
 
 use anyhow::{anyhow, Error};
 use clap::{arg, Command};
@@ -158,10 +154,8 @@ fn verify_signature(blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
     let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkeyhash);
     let signature = signature.into();
     let tx = set_signature(tx, &signature);
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
 
-    let mut verifier = TransactionScriptsVerifier::new(Arc::new(resolved_tx), data_loader.clone());
-    verifier.set_debug_printer(debug_printer);
+    let verifier = gen_tx_scripts_verifier(tx, data_loader);
     let result = verifier.verify(MAX_CYCLES);
     if result.is_err() {
         dbg!(result.unwrap_err());
