@@ -18,9 +18,9 @@ static G_PRIVKEY_BUF: [u8; 32] = [
 ];
 
 enum AuthEntryCategoryType {
-    Exec = 0,
+    // Exec = 0,
     _Dl = 1,
-    _Spawn = 2,
+    Spawn = 2,
 }
 
 lazy_static! {
@@ -36,7 +36,7 @@ fn update_auth_code_hash(tx: &mut ReprMockTransaction) {
 
         buf.extend_from_slice(&[
             AUTH_DL_HASH_TYPE.clone().into(),
-            AuthEntryCategoryType::Exec as u8,
+            AuthEntryCategoryType::Spawn as u8,
         ]);
 
         input.output.lock.args = JsonBytes::from_vec(buf);
