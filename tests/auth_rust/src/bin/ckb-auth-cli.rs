@@ -134,7 +134,7 @@ fn get_algorithm_type(blockchain: &str) -> Result<AlgorithmType, Error> {
 
 fn generate_message(blockchain: &str, pubkeyhash: Vec<u8>) {
     let algorithm_type = get_algorithm_type(blockchain).unwrap();
-    let run_type = EntryCategoryType::Exec;
+    let run_type = EntryCategoryType::Spawn;
     // Note that we must set the official parameter of auth_builder to be true here.
     // The difference between official=true and official=false is that the later
     // convert the message to a form that can be signed directly with secp256k1.
@@ -151,7 +151,7 @@ fn generate_message(blockchain: &str, pubkeyhash: Vec<u8>) {
 
 fn verify_signature(blockchain: &str, pubkeyhash: Vec<u8>, signature: Vec<u8>) {
     let algorithm_type = get_algorithm_type(blockchain).unwrap();
-    let run_type = EntryCategoryType::Exec;
+    let run_type = EntryCategoryType::Spawn;
     let auth = auth_builder(algorithm_type, false).unwrap();
     let config = TestConfig::new(&auth, run_type, 1);
     let mut data_loader = DummyDataLoader::new();

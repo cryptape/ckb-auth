@@ -171,13 +171,13 @@ fn unit_test_common_with_runtype(
 }
 
 fn unit_test_common(algorithm_type: AlgorithmType) {
-    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Exec] {
+    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Spawn] {
         unit_test_common_with_runtype(algorithm_type, t, false);
     }
 }
 
 fn unit_test_common_official(algorithm_type: AlgorithmType) {
-    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Exec] {
+    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Spawn] {
         unit_test_common_with_runtype(algorithm_type, t, true);
     }
 }
@@ -213,7 +213,7 @@ fn bitcoin_uncompress_verify() {
     auth.compress = false;
     let auth: Box<dyn Auth> = auth;
     unit_test_common_with_auth(&auth, EntryCategoryType::DynamicLinking);
-    unit_test_common_with_auth(&auth, EntryCategoryType::Exec);
+    unit_test_common_with_auth(&auth, EntryCategoryType::Spawn);
 }
 
 #[test]
@@ -666,7 +666,7 @@ fn unit_test_ckbmultisig(auth: &Box<dyn Auth>, run_type: EntryCategoryType) {
 fn ckbmultisig_verify() {
     let auth: Box<dyn Auth> = CkbMultisigAuth::new(2, 2, 1);
     unit_test_ckbmultisig(&auth, EntryCategoryType::DynamicLinking);
-    unit_test_ckbmultisig(&auth, EntryCategoryType::Exec);
+    unit_test_ckbmultisig(&auth, EntryCategoryType::Spawn);
 }
 
 #[test]
@@ -703,7 +703,7 @@ fn abnormal_algorithm_type() {
         );
     }
     {
-        let config = TestConfig::new(&auth, EntryCategoryType::Exec, 1);
+        let config = TestConfig::new(&auth, EntryCategoryType::Spawn, 1);
         assert_result_error(
             verify_unit(&config),
             "sign size(smaller)",

@@ -470,8 +470,9 @@ struct EntryType {
 
 #[derive(Clone, Copy)]
 pub enum EntryCategoryType {
-    Exec = 0,
+    // Exec = 0,
     DynamicLinking = 1,
+    Spawn = 2,
 }
 
 #[derive(PartialEq, Eq)]

@@ -12,7 +12,7 @@ typedef struct CkbAuthType {
 } CkbAuthType;
 
 enum EntryCategoryType {
-    EntryCategoryExec = 0,
+    // EntryCategoryExec = 0,
     EntryCategoryDynamicLinking = 1,
     EntryCategorySpawn = 2,
 };
@@ -65,28 +65,6 @@ int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
         }
         return func(id->algorithm_id, signature, signature_size, message32, 32,
                     id->content, 20);
-    } else if (entry->entry_category == EntryCategoryExec) {
-        CkbBinaryArgsType bin = {0};
-        ckb_exec_reset(&bin);
-        err = ckb_exec_append(&bin, entry->code_hash, 32);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, &entry->hash_type, 1);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, &id->algorithm_id, 1);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, (uint8_t *)signature, signature_size);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, (uint8_t *)message32, 32);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, id->content, 20);
-        if (err != 0) return err;
-
-        CkbHexArgsType hex = {.used_buff = 0};
-        err = ckb_exec_encode_params(&bin, &hex);
-        if (err != 0) return err;
-
-        const char *argv[2] = {hex.buff, 0};
-        return ckb_exec_cell(entry->code_hash, entry->hash_type, 0, 0, 1, argv);
     } else if (entry->entry_category == EntryCategorySpawn) {
         CkbBinaryArgsType bin = {0};
         ckb_exec_reset(&bin);
