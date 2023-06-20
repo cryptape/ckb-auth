@@ -169,3 +169,15 @@ SigV2DXdetxj9qiRe6PHsch9EwZVutb1FFR38ubNuM9ef8YPYcnjAisLWo4sLZMoT3g4Z48VRD3xAUsk
 Stripping the prefix `SigV2` of `SigV2DXdetxj9qiRe6PHsch9EwZVutb1FFR38ubNuM9ef8YPYcnjAisLWo4sLZMoT3g4Z48VRD3xAUsk1EcfthWcxnayW`,
 we get the base58 representation of the signature. Note that monero's implementation of base58 is different from bitcoin's.
 See [monero-rs/base58-monero](https://github.com/monero-rs/base58-monero) for how to manipulate monero base58 data programatically.
+
+In order for ckb-auth to acutally verify the vailidity of the signature, we need to store the signature,
+the mode that used to sign the transactions and public keys (spend key followed by view key).
+For example, to verify the signature with base65 encoding `3ZKheximq145tW14dshL17Jpqp2GJn296GfRnGqt3pMeaZU7xoEEAFr2Xm7Jc7xZjYWf6KhstZanA73to7uF6rea`
+which is signed by the spend key of monero account `41eBLjYsK28CJD5z2b7FojMCDg6vERASShVZqAvnsC9LhS7saG8CmMo5Rm92wgnT8wa6nJVu57MHHjmnoyvTpCG7NQ7dErc`
+we need to use the data whose hex encoding is
+```
+0f49fbc1bee9b7d31d3918a3753af5526a915e1f930198315da3e43bbd32f109c8a40ece34f42ff909263e16bb43f53bb14e5fe90de6c04f242b7c6a73ee320f00007caf7a553a894389dd562115b17e78ba84a5c7692677f216c54385dc5c6ff1bbcb8c902571ae1a777f7f07a023ecc5e3d83ba624d4b0ffb7eff79e8b5d10bd
+```
+where the first 64 bytes `0f49fbc1bee9b7d31d3918a3753af5526a915e1f930198315da3e43bbd32f109c8a40ece34f42ff909263e16bb43f53bb14e5fe90de6c04f242b7c6a73ee320f` are the signature itself,
+the 65th byte is the mode for siging (here `00`, which stands for signing with spend key),
+the next 64 bytes `007caf7a553a894389dd562115b17e78ba84a5c7692677f216c54385dc5c6ff1bbcb8c902571ae1a777f7f07a023ecc5e3d83ba624d4b0ffb7eff79e8b5d10bd` are the public spend key followed by public view key.
