@@ -26,7 +26,7 @@
 
 #include "ckb_auth.h"
 #undef CKB_SUCCESS
-#include "ckb_exec.h"
+#include "ckb_hex.h"
 #include "blake2b.h"
 // clang-format on
 
@@ -355,7 +355,7 @@ int validate_signature_cardano(void *prefilled_data, const uint8_t *sig,
     int suc = ed25519_verify(cardano_data.signature, cardano_data.sign_message,
                              CARDANO_LOCK_SIGNATURE_MESSAGE_SIZE,
                              cardano_data.public_key);
-    CHECK2(suc == 1, ERROR_EXEC_INVALID_SIG);
+    CHECK2(suc == 1, ERROR_WRONG_STATE);
 
     blake2b_state ctx;
     uint8_t pubkey_hash[BLAKE2B_BLOCK_SIZE] = {0};
@@ -792,7 +792,7 @@ typedef struct {
 #ifdef CKB_USE_SIM
 int simulator_main(int argc, char *argv[]) {
 #else
-// exec entry
+// spawn entry
 int main(int argc, char *argv[]) {
 // fix error:
 // c/auth.c:810:50: error: array subscript 0 is outside array bounds of
@@ -873,24 +873,24 @@ int main(int argc, char *argv[]) {
     uint8_t pubkey_hash[BLAKE160_SIZE];
 
     // auth algorithm id
-    CHECK2(!_exec_hex2bin(ARGV_ALGORITHM_ID, &algorithm_id, 1,
-                          &algorithm_id_len) &&
-               algorithm_id_len == 1,
-           ERROR_SPAWN_INVALID_ALGORITHM_ID);
+    CHECK2(
+        !ckb_hex2bin(ARGV_ALGORITHM_ID, &algorithm_id, 1, &algorithm_id_len) &&
+            algorithm_id_len == 1,
+        ERROR_SPAWN_INVALID_ALGORITHM_ID);
 
     // signature
-    CHECK2(!_exec_hex2bin(ARGV_SIGNATURE, signature, signature_len,
-                          &signature_len),
-           ERROR_SPAWN_INVALID_SIG);
+    CHECK2(
+        !ckb_hex2bin(ARGV_SIGNATURE, signature, signature_len, &signature_len),
+        ERROR_SPAWN_INVALID_SIG);
 
     // message
-    CHECK2(!_exec_hex2bin(ARGV_MESSAGE, message, message_len, &message_len) &&
+    CHECK2(!ckb_hex2bin(ARGV_MESSAGE, message, message_len, &message_len) &&
                message_len == BLAKE2B_BLOCK_SIZE,
            ERROR_SPAWN_INVALID_MSG);
 
     // public key hash
-    CHECK2(!_exec_hex2bin(ARGV_PUBKEY_HASH, pubkey_hash, pubkey_hash_len,
-                          &pubkey_hash_len) &&
+    CHECK2(!ckb_hex2bin(ARGV_PUBKEY_HASH, pubkey_hash, pubkey_hash_len,
+                        &pubkey_hash_len) &&
                pubkey_hash_len == BLAKE160_SIZE,
            ERROR_SPAWN_INVALID_PUBKEY);
 

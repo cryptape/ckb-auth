@@ -3,7 +3,7 @@
 
 #include "ckb_consts.h"
 #include "ckb_dlfcn.h"
-#include "ckb_exec.h"
+#include "ckb_hex.h"
 
 // TODO: when ready, move it into ckb-c-stdlib
 typedef struct CkbAuthType {
@@ -72,22 +72,22 @@ int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
         char pubkey_hash_str[20 * 2 + 1];
 
         uint32_t bin2hex_output_len = 0;
-        if (_exec_bin2hex(&id->algorithm_id, 1, algorithm_id_str,
+        if (ckb_bin2hex(&id->algorithm_id, 1, algorithm_id_str,
                           sizeof(algorithm_id_str), &bin2hex_output_len,
                           true)) {
             return CKB_INVALID_DATA;
         }
 
-        if (_exec_bin2hex(signature, signature_size, signature_str,
+        if (ckb_bin2hex(signature, signature_size, signature_str,
                           sizeof(signature_str), &bin2hex_output_len, true)) {
             return CKB_INVALID_DATA;
         }
-        if (_exec_bin2hex(message32, 32, message_str, sizeof(message_str),
+        if (ckb_bin2hex(message32, 32, message_str, sizeof(message_str),
                           &bin2hex_output_len, true)) {
             return CKB_INVALID_DATA;
         }
 
-        if (_exec_bin2hex(id->content, 20, pubkey_hash_str,
+        if (ckb_bin2hex(id->content, 20, pubkey_hash_str,
                           sizeof(pubkey_hash_str), &bin2hex_output_len, true)) {
             return CKB_INVALID_DATA;
         }
