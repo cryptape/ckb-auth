@@ -14,7 +14,7 @@ all: build/auth_demo
 all-via-docker:
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make -f examples/auth-demo/Makefile all"
 
-build/auth_demo: examples/auth-demo/auth_demo.c
+build/auth_demo: examples/auth-demo/auth_demo.c c/ckb_auth.h
 	$(CC) $(AUTH_CFLAGS) $(LDFLAGS) -o $@ $^
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@

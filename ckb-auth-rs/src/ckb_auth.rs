@@ -125,27 +125,19 @@ fn ckb_auth_spawn(
     signature: &[u8],
     message: &[u8; 32],
 ) -> Result<(), CkbAuthError> {
-    let args = CString::new(format!(
-        "{}:{:02X?}:{:02X?}:{}:{}:{}",
-        encode(&entry.code_hash),
-        entry.hash_type as u8,
-        id.algorithm_id.clone() as u8,
-        encode(signature),
-        encode(message),
-        encode(id.pubkey_hash)
-    ))?;
+    let algorithm_id_str = CString::new(format!("{:02X?}", id.algorithm_id.clone() as u8,))?;
+    let signature_str = CString::new(format!("{}", encode(signature)))?;
+    let message_str = CString::new(format!("{}", encode(message)))?;
+    let pubkey_hash_str = CString::new(format!("{}", encode(id.pubkey_hash)))?;
 
-    // args     id + pubhash + code_hash + hash_type + entry_category
-    // witness  sign
+    let args = [
+        algorithm_id_str.as_c_str(),
+        signature_str.as_c_str(),
+        message_str.as_c_str(),
+        pubkey_hash_str.as_c_str(),
+    ];
 
-    // info!("args: {:?}", args);
-    spawn_cell(
-        &entry.code_hash,
-        entry.hash_type,
-        &[args.as_c_str()],
-        8,
-        &mut Vec::new(),
-    )?;
+    spawn_cell(&entry.code_hash, entry.hash_type, &args, 8, &mut Vec::new())?;
     Ok(())
 }
 

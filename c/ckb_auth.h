@@ -66,34 +66,41 @@ int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
         return func(id->algorithm_id, signature, signature_size, message32, 32,
                     id->content, 20);
     } else if (entry->entry_category == EntryCategorySpawn) {
-        CkbBinaryArgsType bin = {0};
-        ckb_exec_reset(&bin);
-        err = ckb_exec_append(&bin, entry->code_hash, 32);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, &entry->hash_type, 1);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, &id->algorithm_id, 1);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, (uint8_t *)signature, signature_size);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, (uint8_t *)message32, 32);
-        if (err != 0) return err;
-        err = ckb_exec_append(&bin, id->content, 20);
-        if (err != 0) return err;
+        char algorithm_id_str[2 + 1];
+        char signature_str[signature_size * 2 + 1];
+        char message_str[32 * 2 + 1];
+        char pubkey_hash_str[20 * 2 + 1];
 
-        CkbHexArgsType hex = {.used_buff = 0};
-        err = ckb_exec_encode_params(&bin, &hex);
-        if (err != 0) return err;
-        const char *argv[2] = {hex.buff, 0};
+        uint32_t bin2hex_output_len = 0;
+        if (_exec_bin2hex(&id->algorithm_id, 1, algorithm_id_str,
+                          sizeof(algorithm_id_str), &bin2hex_output_len,
+                          true)) {
+            return CKB_INVALID_DATA;
+        }
 
-        // uint8_t context[1] = {0};
-        // uint64_t content_length = sizeof(context);
+        if (_exec_bin2hex(signature, signature_size, signature_str,
+                          sizeof(signature_str), &bin2hex_output_len, true)) {
+            return CKB_INVALID_DATA;
+        }
+        if (_exec_bin2hex(message32, 32, message_str, sizeof(message_str),
+                          &bin2hex_output_len, true)) {
+            return CKB_INVALID_DATA;
+        }
+
+        if (_exec_bin2hex(id->content, 20, pubkey_hash_str,
+                          sizeof(pubkey_hash_str), &bin2hex_output_len, true)) {
+            return CKB_INVALID_DATA;
+        }
+
+        const char *argv[4] = {algorithm_id_str, signature_str, message_str,
+                               pubkey_hash_str};
+
         int8_t exit_code = 0;
 
         spawn_args_t spawn_args = {0};
         spawn_args.memory_limit = 8;
         spawn_args.exit_code = &exit_code;
-        err = ckb_spawn_cell(entry->code_hash, entry->hash_type, 0, 0, 1, argv,
+        err = ckb_spawn_cell(entry->code_hash, entry->hash_type, 0, 0, 4, argv,
                              &spawn_args);
         if (err != 0) return err;
         return exit_code;

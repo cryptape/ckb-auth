@@ -75,6 +75,13 @@ enum AuthErrorCodeType {
     ERROR_EXEC_NOT_PAIRED,
     ERROR_EXEC_INVALID_SIG,
     ERROR_EXEC_INVALID_MSG,
+    // spawn
+    ERROR_SPAWN_INVALID_LENGTH,
+    ERROR_SPAWN_SIGN_TOO_LONG,
+    ERROR_SPAWN_INVALID_ALGORITHM_ID,
+    ERROR_SPAWN_INVALID_SIG,
+    ERROR_SPAWN_INVALID_MSG,
+    ERROR_SPAWN_INVALID_PUBKEY,
     // schnorr
     ERROR_SCHNORR,
 };
@@ -774,62 +781,6 @@ exit:
     return err;
 }
 
-#define MAX_ENTRY_SIZE 128
-typedef struct ValidationEntry {
-    uint8_t auth_algorithm_id;
-    bool has_auth_algorithm_id;
-    uint8_t *pubkey_hash;
-    uint32_t pubkey_hash_len;
-    bool has_pubkey;
-
-    uint8_t *msg;
-    uint32_t msg_len;
-    bool has_msg;
-
-    uint8_t *sig;
-    uint32_t sig_len;
-    bool has_sig;
-} ValidationEntry;
-
-int chained_continue(int argc, char *argv[]) {
-    int err = 0;
-    char *next = NULL;
-    uint8_t *param_ptr = NULL;
-    uint32_t param_len = 0;
-
-    size_t param_index = 0;
-    uint8_t next_code_hash[32] = {0};
-
-    // don't change argv[1] in place
-    char argv1[256] = {0};
-    size_t argv1_len = strlen(argv[1]);
-    if (argv1_len >= 255) {
-        memcpy(argv1, argv[1], 255);
-    } else {
-        memcpy(argv1, argv[1], argv1_len);
-    }
-
-    next = argv1;
-    while (true) {
-        CHECK2(next != NULL, ERROR_EXEC_INVALID_LENGTH);
-        err = ckb_exec_decode_params(next, &param_ptr, &param_len, &next);
-        CHECK(err);
-        CHECK2(param_len > 0, ERROR_EXEC_INVALID_LENGTH);
-        if (param_index == 0) {
-            CHECK2(param_len == 32, ERROR_EXEC_INVALID_LENGTH);
-            memcpy(next_code_hash, param_ptr, 32);
-        } else if (param_index == 1) {
-            CHECK2(param_len == 1, ERROR_EXEC_INVALID_LENGTH);
-            return ckb_exec_cell(next_code_hash, *param_ptr, 0, 0, argc - 1,
-                                 (const char **)(argv + 1));
-        }
-        param_index++;
-    }
-
-exit:
-    return err;
-}
-
 #define OFFSETOF(TYPE, ELEMENT) ((size_t) & (((TYPE *)0)->ELEMENT))
 #define PT_DYNAMIC 2
 
@@ -890,94 +841,68 @@ int main(int argc, char *argv[]) {
 #endif
 
     int err = 0;
-    uint8_t *param_ptr = NULL;
-    uint32_t param_len = 0;
 
-    if (argc <= 0) {
+    if (argc != 4) {
         return -1;
     }
 
-    char *next = argv[0];
-    size_t param_index = 0;
-    ValidationEntry entries[MAX_ENTRY_SIZE] = {0};
-    size_t entry_index = 0;
-    while (true) {
-        // pattern to use "ckb_exec_decode_params":
-        // if next is NULL, in last iterator, it encounters \0.
-        // when error is returned, there must be an error in call
-        if (next == NULL) break;
-        err = ckb_exec_decode_params(next, &param_ptr, &param_len, &next);
-        CHECK(err);
+#define ARGV_ALGORITHM_ID argv[0]
+#define ARGV_SIGNATURE argv[1]
+#define ARGV_MESSAGE argv[2]
+#define ARGV_PUBKEY_HASH argv[3]
 
-        if (param_index == 0) {
-            // code hash
-            CHECK2(param_len == 32, ERROR_EXEC_INVALID_LENGTH);
-        } else if (param_index == 1) {
-            // hash type
-            CHECK2(param_len == 1, ERROR_EXEC_INVALID_LENGTH);
-        } else if ((param_index - 2) % 4 == 0) {
-            // auth algorithm id
-            CHECK2(param_len == 1, ERROR_EXEC_INVALID_LENGTH);
-            entry_index = (param_index - 2) / 4;
-            CHECK2(entry_index < MAX_ENTRY_SIZE, CKB_INDEX_OUT_OF_BOUND);
-            entries[entry_index].auth_algorithm_id = *param_ptr;
-            entries[entry_index].has_auth_algorithm_id = true;
-        } else if ((param_index - 2) % 4 == 1) {
-            // signature
-            CHECK2(param_len > 0, ERROR_EXEC_INVALID_SIG);
-            entry_index = (param_index - 2) / 4;
-            CHECK2(entry_index < MAX_ENTRY_SIZE, CKB_INDEX_OUT_OF_BOUND);
-            entries[entry_index].sig = param_ptr;
-            entries[entry_index].sig_len = param_len;
-            entries[entry_index].has_sig = true;
-        } else if ((param_index - 2) % 4 == 2) {
-            // message
-            CHECK2(param_len > 0, ERROR_EXEC_INVALID_MSG);
-            entry_index = (param_index - 2) / 4;
-            CHECK2(entry_index < MAX_ENTRY_SIZE, CKB_INDEX_OUT_OF_BOUND);
-            entries[entry_index].msg = param_ptr;
-            entries[entry_index].msg_len = param_len;
-            entries[entry_index].has_msg = true;
-        } else if ((param_index - 2) % 4 == 3) {
-            // pubkey hash
-            CHECK2(param_len > 0, ERROR_EXEC_INVALID_LENGTH);
-            entry_index = (param_index - 2) / 4;
-            CHECK2(entry_index < MAX_ENTRY_SIZE, CKB_INDEX_OUT_OF_BOUND);
-            entries[entry_index].pubkey_hash = param_ptr;
-            entries[entry_index].pubkey_hash_len = param_len;
-            entries[entry_index].has_pubkey = true;
-        } else {
-            // code error
-            CHECK2(false, ERROR_EXEC_INVALID_PARAM);
-        }
-        param_index++;
-    }
-    // All of sig, msg, pubkey_hash must be present
-    CHECK2(entries[entry_index].sig_len > 0, ERROR_EXEC_NOT_PAIRED);
-    CHECK2(entries[entry_index].pubkey_hash_len > 0, ERROR_EXEC_NOT_PAIRED);
-    CHECK2(entries[entry_index].msg_len > 0, ERROR_EXEC_NOT_PAIRED);
+    uint32_t algorithm_id_len = strlen(ARGV_ALGORITHM_ID);
+    uint32_t signature_len = strlen(ARGV_SIGNATURE);
+    uint32_t message_len = strlen(ARGV_MESSAGE);
+    uint32_t pubkey_hash_len = strlen(ARGV_PUBKEY_HASH);
 
-    for (size_t i = 0; i <= entry_index; i++) {
-        ValidationEntry *entry = entries + i;
-        CHECK2(entry->has_auth_algorithm_id, ERROR_EXEC_INVALID_PARAM);
-        CHECK2(entry->has_msg, ERROR_EXEC_INVALID_PARAM);
-        CHECK2(entry->has_sig, ERROR_EXEC_INVALID_PARAM);
-        CHECK2(entry->has_pubkey, ERROR_EXEC_INVALID_PARAM);
-        err = ckb_auth_validate(entry->auth_algorithm_id, entry->sig,
-                                entry->sig_len, entry->msg, entry->msg_len,
-                                entry->pubkey_hash, entry->pubkey_hash_len);
-        CHECK(err);
+    if (algorithm_id_len != 2 || signature_len % 2 != 0 ||
+        message_len != BLAKE2B_BLOCK_SIZE * 2 ||
+        pubkey_hash_len != BLAKE160_SIZE * 2) {
+        return ERROR_SPAWN_INVALID_LENGTH;
     }
 
-    if (argc > 1) {
-        // The chained lock script would locate the cell using code hash and
-        // hash type included in argv[1]. It will then remove argv[0] from
-        // argvs, then use the remaining arguments to invoke exec syscall using
-        // binary provided by the located cell.
-        err = chained_continue(argc, argv);
-        CHECK(err);
+    // Limit the maximum size of signature
+    if (signature_len > 1024 * 64 * 2) {
+        return ERROR_SPAWN_SIGN_TOO_LONG;
     }
+
+    uint8_t algorithm_id = 0;
+    uint8_t signature[signature_len / 2];
+    uint8_t message[BLAKE2B_BLOCK_SIZE];
+    uint8_t pubkey_hash[BLAKE160_SIZE];
+
+    // auth algorithm id
+    CHECK2(!_exec_hex2bin(ARGV_ALGORITHM_ID, &algorithm_id, 1,
+                          &algorithm_id_len) &&
+               algorithm_id_len == 1,
+           ERROR_SPAWN_INVALID_ALGORITHM_ID);
+
+    // signature
+    CHECK2(!_exec_hex2bin(ARGV_SIGNATURE, signature, signature_len,
+                          &signature_len),
+           ERROR_SPAWN_INVALID_SIG);
+
+    // message
+    CHECK2(!_exec_hex2bin(ARGV_MESSAGE, message, message_len, &message_len) &&
+               message_len == BLAKE2B_BLOCK_SIZE,
+           ERROR_SPAWN_INVALID_MSG);
+
+    // public key hash
+    CHECK2(!_exec_hex2bin(ARGV_PUBKEY_HASH, pubkey_hash, pubkey_hash_len,
+                          &pubkey_hash_len) &&
+               pubkey_hash_len == BLAKE160_SIZE,
+           ERROR_SPAWN_INVALID_PUBKEY);
+
+    err = ckb_auth_validate(algorithm_id, signature, signature_len, message,
+                            message_len, pubkey_hash, pubkey_hash_len);
+    CHECK(err);
 
 exit:
     return err;
+
+#undef ARGV_ALGORITHM_ID
+#undef ARGV_SIGNATURE
+#undef ARGV_MESSAGE
+#undef ARGV_PUBKEY_HASH
 }
