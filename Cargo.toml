@@ -1,6 +1,6 @@
 [workspace]
 members = ["examples/auth-rust-demo"]
-exclude = ["tests"]
+exclude = ["tests", "tools/ckb-auth-cli"]
 
 [profile.release]
 overflow-checks = true
