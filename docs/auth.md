@@ -140,7 +140,7 @@ typedef struct EntryType {
 
   The entry to the algorithm. Now there are 2 categories:
   - dynamic library
-  - spawn
+  - spawn (activated after hardfork 2023)
 
 ### Entry Category: Dynamic Library
 We define the follow functions when entry category is `dynamic library`:
