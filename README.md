@@ -20,7 +20,7 @@ using her Ethereum wallet without requiring the creation of a CKB wallet
 throughout the process.
 
 ## Integration
-The [Portal Wallet]((https://docs.nervos.org/docs/basics/guides/crypto%20wallets/portalwallet)) offers support for the following blockchains:
+The [Portal Wallet](https://docs.nervos.org/docs/basics/guides/crypto%20wallets/portalwallet) offers support for the following blockchains:
 * Bitcoin
 * Ethereum
 * EOS
