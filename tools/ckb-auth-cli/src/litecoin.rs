@@ -1,13 +1,12 @@
 use super::{BlockChain, BlockChainArgs};
 use anyhow::{anyhow, Error};
 use ckb_auth_rs::{
-    auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash, get_message_to_sign,
-    set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType, TestConfig, MAX_CYCLES,
+    auth_builder, debug_printer, gen_tx_scripts_verifier, gen_tx_with_pub_key_hash,
+    get_message_to_sign, set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType,
+    TestConfig, MAX_CYCLES,
 };
-use ckb_script::TransactionScriptsVerifier;
 use clap::{arg, ArgMatches, Command};
 use hex::{decode, encode};
-use std::sync::Arc;
 
 pub struct LitecoinLockArgs {}
 
@@ -54,7 +53,7 @@ impl BlockChain for LitecoinLock {
     fn generate(&self, operate_mathches: &ArgMatches) -> Result<(), Error> {
         let pubkey_hash = get_pubkey_hash_by_args(operate_mathches)?;
 
-        let run_type = EntryCategoryType::Exec;
+        let run_type = EntryCategoryType::Spawn;
         // Note that we must set the official parameter of auth_builder to be true here.
         // The difference between official=true and official=false is that the later
         // convert the message to a form that can be signed directly with secp256k1.
@@ -85,23 +84,22 @@ impl BlockChain for LitecoinLock {
         let signature: Vec<u8> = decode_string(signature, encoding)?;
 
         let algorithm_type = AlgorithmType::Litecoin;
-    let run_type = EntryCategoryType::Exec;
-    let auth = auth_builder(algorithm_type, false).unwrap();
-    let config = TestConfig::new(&auth, run_type, 1);
-    let mut data_loader = DummyDataLoader::new();
-    let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkey_hash.to_vec());
-    let signature = signature.into();
-    let tx = set_signature(tx, &signature);
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+        let run_type = EntryCategoryType::Spawn;
+        let auth = auth_builder(algorithm_type, false).unwrap();
+        let config = TestConfig::new(&auth, run_type, 1);
+        let mut data_loader = DummyDataLoader::new();
+        let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkey_hash.to_vec());
+        let signature = signature.into();
+        let tx = set_signature(tx, &signature);
+        let mut verifier = gen_tx_scripts_verifier(tx, data_loader);
 
-    let mut verifier = TransactionScriptsVerifier::new(Arc::new(resolved_tx), data_loader.clone());
-    verifier.set_debug_printer(debug_printer);
-    let result = verifier.verify(MAX_CYCLES);
-    if result.is_err() {
-        dbg!(result.unwrap_err());
-        panic!("Verification failed");
-    }
-    println!("Signature verification succeeded!");
+        verifier.set_debug_printer(debug_printer);
+        let result = verifier.verify(MAX_CYCLES);
+        if result.is_err() {
+            dbg!(result.unwrap_err());
+            panic!("Verification failed");
+        }
+        println!("Signature verification succeeded!");
 
         Ok(())
     }

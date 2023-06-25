@@ -74,11 +74,17 @@ impl BlockChain for CardanoLock {
             get_data_by_cddl(&signature_file)
         };
 
-        let message = decode(
-            operate_mathches
+        let message = decode({
+            let msg = operate_mathches
                 .get_one::<String>("message")
-                .expect("get cardano signauthe message"),
-        )
+                .expect("get cardano signauthe message");
+            let pos = msg.find("#");
+            if pos.is_some() {
+                msg[0..pos.unwrap()].to_string()
+            } else {
+                msg.clone()
+            }
+        })
         .expect("decode signature message data");
 
         cardano_verify(&pubkey_hash, &message, &signature)?;

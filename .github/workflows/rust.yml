@@ -30,4 +30,6 @@ jobs:
       run: cd tests/cardano_lock && make install_cardano_tools
     - name: Run cardano tests
       run: cd tests/cardano_lock && make all
+    - name: Run ckb-auth-cli tests
+      run: cd tools/ckb-auth-cli && cargo test
 

@@ -43,6 +43,7 @@ enum CardanoErrorCodeType {
     CardanoErr_CBORType,
     CardanoErr_InvaildCKBSignMsgLen,
     CardanoErr_InvaildSignMsgLen,
+    CardanoErr_InvaildSignMsgIndex,
     CardanoErr_InvaildPubKeyLen,
     CardanoErr_InvaildSignLen,
 };
@@ -162,6 +163,11 @@ int get_ckb_sign_hash(nanocbor_value_t meta_data_node,
     CHECK2(sizeof(output->ckb_sign_msg) == len,
            CardanoErr_InvaildCKBSignMsgLen);
     memcpy(output->ckb_sign_msg, hash, len);
+
+    int32_t message_index = -1;
+    CHECK2(nanocbor_get_int32(&ckb_sign_hash_message3, &message_index) >= 0,
+           CardanoErr_InvaildSignMsgIndex);
+    CHECK2(message_index == 0, CardanoErr_InvaildSignMsgIndex);
 exit:
     return err;
 }

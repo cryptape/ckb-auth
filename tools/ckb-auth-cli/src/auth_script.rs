@@ -1,14 +1,10 @@
 use anyhow::{anyhow, Error};
 use ckb_auth_rs::AlgorithmType;
-use ckb_types::core::ScriptHashType;
-use ckb_vm::instructions::{extract_opcode, insts};
+use ckb_vm::cost_model::estimate_cycles;
 use ckb_vm::registers::{A0, A7};
-use ckb_vm::{Bytes, Instruction, Memory, Register, SupportMachine, Syscalls};
+use ckb_vm::{Bytes, Memory, Register, SupportMachine, Syscalls};
 use hex::encode;
 use lazy_static::lazy_static;
-
-const AUTH_CODE_HASH: [u8; 32] = [0; 32];
-const AUTH_HASH_TYPE: ScriptHashType = ScriptHashType::Data1;
 
 lazy_static! {
     pub static ref AUTH_CODE: Bytes = Bytes::from(&include_bytes!("../../../build/auth")[..]);
@@ -47,54 +43,6 @@ impl<Mac: SupportMachine> Syscalls<Mac> for DebugSyscall {
         Ok(true)
     }
 }
-pub fn instruction_cycles(i: Instruction) -> u64 {
-    match extract_opcode(i) {
-        // IMC
-        insts::OP_JALR => 3,
-        insts::OP_LD => 2,
-        insts::OP_LW => 3,
-        insts::OP_LH => 3,
-        insts::OP_LB => 3,
-        insts::OP_LWU => 3,
-        insts::OP_LHU => 3,
-        insts::OP_LBU => 3,
-        insts::OP_SB => 3,
-        insts::OP_SH => 3,
-        insts::OP_SW => 3,
-        insts::OP_SD => 2,
-        insts::OP_BEQ => 3,
-        insts::OP_BGE => 3,
-        insts::OP_BGEU => 3,
-        insts::OP_BLT => 3,
-        insts::OP_BLTU => 3,
-        insts::OP_BNE => 3,
-        insts::OP_EBREAK => 500,
-        insts::OP_ECALL => 500,
-        insts::OP_JAL => 3,
-        insts::OP_MUL => 5,
-        insts::OP_MULW => 5,
-        insts::OP_MULH => 5,
-        insts::OP_MULHU => 5,
-        insts::OP_MULHSU => 5,
-        insts::OP_DIV => 32,
-        insts::OP_DIVW => 32,
-        insts::OP_DIVU => 32,
-        insts::OP_DIVUW => 32,
-        insts::OP_REM => 32,
-        insts::OP_REMW => 32,
-        insts::OP_REMU => 32,
-        insts::OP_REMUW => 32,
-        // MOP
-        insts::OP_WIDE_MUL => 5,
-        insts::OP_WIDE_MULU => 5,
-        insts::OP_WIDE_MULSU => 5,
-        insts::OP_WIDE_DIV => 32,
-        insts::OP_WIDE_DIVU => 32,
-        insts::OP_FAR_JUMP_REL => 3,
-        insts::OP_FAR_JUMP_ABS => 3,
-        _ => 1,
-    }
-}
 
 pub fn run_auth_exec(
     algorithm_id: AlgorithmType,
@@ -102,15 +50,10 @@ pub fn run_auth_exec(
     message: &[u8],
     sign: &[u8],
 ) -> Result<(), Error> {
-    let args = format!(
-        "{}:{:02X?}:{:02X?}:{}:{}:{}",
-        encode(&AUTH_CODE_HASH),
-        AUTH_HASH_TYPE as u8,
-        algorithm_id as u8,
-        encode(sign),
-        encode(message),
-        encode(pubkey_hash)
-    );
+    let args_algorithm_id = format!("{:02X?}", algorithm_id as u8);
+    let args_sign = encode(sign);
+    let args_msg = encode(message);
+    let args_pubkey_hash = encode(pubkey_hash);
 
     let asm_core = ckb_vm::machine::asm::AsmCoreMachine::new(
         ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
@@ -118,12 +61,20 @@ pub fn run_auth_exec(
         u64::MAX,
     );
     let core = ckb_vm::DefaultMachineBuilder::new(asm_core)
-        .instruction_cycle_func(Box::new(instruction_cycles))
+        .instruction_cycle_func(Box::new(estimate_cycles))
         .syscall(Box::new(DebugSyscall {}))
         .build();
     let mut machine = ckb_vm::machine::asm::AsmMachine::new(core);
     machine
-        .load_program(&AUTH_CODE, &[Bytes::copy_from_slice(args.as_bytes())])
+        .load_program(
+            &AUTH_CODE,
+            &[
+                Bytes::copy_from_slice(args_algorithm_id.as_bytes()),
+                Bytes::copy_from_slice(args_sign.as_bytes()),
+                Bytes::copy_from_slice(args_msg.as_bytes()),
+                Bytes::copy_from_slice(args_pubkey_hash.as_bytes()),
+            ],
+        )
         .expect("load auth_code failed");
     let exit = machine.run().expect("run failed");
 
