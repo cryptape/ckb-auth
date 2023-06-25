@@ -111,7 +111,7 @@ Key parameters:
 - pubkey hash: blake160 of pubkey
 
 #### More blockchains Support Are Ongoing ...
-- XRP
+- Ripple
 - Monero
 - Solana
 
