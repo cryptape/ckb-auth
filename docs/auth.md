@@ -3,6 +3,25 @@ was firstly introduced in [RFC:
 Omnilock](https://github.com/nervosnetwork/rfcs/pull/343). It's used for
 authentication by validating signature for different blockchains.
 
+### Compile dependencies
+Before using the following APIs, it is necessary to compile CKB contracts.
+
+To compile, use the following commands in the root directory. The generated files will be located in the `build` directory.
+
+```
+git submodule update --init
+make all-via-docker
+```
+
+If you need to test or use `ckb-auth-cli`, you also need to compile the `auth-demo`:
+
+```
+capsule build
+make -f examples/auth-demo/Makefile all-via-docker
+```
+
+For detailed instructions, please refer to the [README.md](../README.md) or [CI](../.github/workflows/rust.yml).
+
 ### Definition
 
 ```C
