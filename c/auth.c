@@ -475,11 +475,12 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
     CHECK2(sig_len == MONERO_DATA_SIZE, ERROR_INVALID_ARG);
 
     uint8_t *mode_ptr = (uint8_t *)sig + MONERO_SIGNATURE_SIZE;
-    CHECK2(*mode_ptr != 0 || *mode_ptr != 1, ERROR_INVALID_ARG);
+    // We only support using spend key to sign transactions.
+    CHECK2(*mode_ptr == 0, ERROR_INVALID_ARG);
 
     uint8_t *spend_pubkey = mode_ptr + sizeof(*mode_ptr);
     uint8_t *view_pubkey = spend_pubkey + MONERO_PUBKEY_SIZE;
-    uint8_t *pubkey = *mode_ptr == 0 ? spend_pubkey : view_pubkey;
+    uint8_t *pubkey = spend_pubkey;
 
     uint8_t hash[MONERO_KECCAK_SIZE];
     get_monero_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg,
