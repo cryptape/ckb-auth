@@ -1,14 +1,10 @@
 use anyhow::{anyhow, Error};
 use ckb_auth_rs::AlgorithmType;
-use ckb_types::core::ScriptHashType;
 use ckb_vm::cost_model::estimate_cycles;
 use ckb_vm::registers::{A0, A7};
 use ckb_vm::{Bytes, Memory, Register, SupportMachine, Syscalls};
 use hex::encode;
 use lazy_static::lazy_static;
-
-const AUTH_CODE_HASH: [u8; 32] = [0; 32];
-const AUTH_HASH_TYPE: ScriptHashType = ScriptHashType::Data1;
 
 lazy_static! {
     pub static ref AUTH_CODE: Bytes = Bytes::from(&include_bytes!("../../../build/auth")[..]);
@@ -54,15 +50,10 @@ pub fn run_auth_exec(
     message: &[u8],
     sign: &[u8],
 ) -> Result<(), Error> {
-    let args = format!(
-        "{}:{:02X?}:{:02X?}:{}:{}:{}",
-        encode(&AUTH_CODE_HASH),
-        AUTH_HASH_TYPE as u8,
-        algorithm_id as u8,
-        encode(sign),
-        encode(message),
-        encode(pubkey_hash)
-    );
+    let args_algorithm_id = format!("{:02X?}", algorithm_id as u8);
+    let args_sign = encode(sign);
+    let args_msg = encode(message);
+    let args_pubkey_hash = encode(pubkey_hash);
 
     let asm_core = ckb_vm::machine::asm::AsmCoreMachine::new(
         ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
@@ -75,7 +66,15 @@ pub fn run_auth_exec(
         .build();
     let mut machine = ckb_vm::machine::asm::AsmMachine::new(core);
     machine
-        .load_program(&AUTH_CODE, &[Bytes::copy_from_slice(args.as_bytes())])
+        .load_program(
+            &AUTH_CODE,
+            &[
+                Bytes::copy_from_slice(args_algorithm_id.as_bytes()),
+                Bytes::copy_from_slice(args_sign.as_bytes()),
+                Bytes::copy_from_slice(args_msg.as_bytes()),
+                Bytes::copy_from_slice(args_pubkey_hash.as_bytes()),
+            ],
+        )
         .expect("load auth_code failed");
     let exit = machine.run().expect("run failed");
 

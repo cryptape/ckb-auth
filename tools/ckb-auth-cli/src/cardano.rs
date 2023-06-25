@@ -78,8 +78,12 @@ impl BlockChain for CardanoLock {
             let msg = operate_mathches
                 .get_one::<String>("message")
                 .expect("get cardano signauthe message");
-            // if msg.
-            msg
+            let pos = msg.find("#");
+            if pos.is_some() {
+                msg[0..pos.unwrap()].to_string()
+            } else {
+                msg.clone()
+            }
         })
         .expect("decode signature message data");
 

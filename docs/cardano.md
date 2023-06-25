@@ -28,7 +28,7 @@ tests/cardano_lock/bin/cardano-cli node key-gen \
 The private key is stored in the `cold.skey.json` file, while the public key is stored in the `cold.vkey.json` file. These files are in JSON format, and the key is stored in `cborHex`. The hexadecimal data represents the key, with the actual key data following the "5820" prefix and being 32 bytes long.
 Afterward, you can obtain the hash of the public key for use with ckb-auth-cli. The public key needs to include all the data from the cborHex field in `cold.vkey.json` (the program will handle this data).
 ```bash
-ckb-auth-cli cardano parse --vkey tests/cardano_lock/test_data/cold.vkey.json
+tools/ckb-auth-cli/target/debug/ckb-auth-cli cardano parse --vkey tests/cardano_lock/test_data/cold.vkey.json
 ```
 
 ### Signature
@@ -53,7 +53,7 @@ Once the execution is complete, the signed data will be stored in `cardano_tx.si
 ### Verify
 Here use ckb-auth-cli for verify
 ```bash
-ckb-auth-cli cardano verify -p <Public key hash> -m $message --signature_file tests/cardano_lock/test_data/cardano_tx.signed.json
+tools/ckb-auth-cli/target/debug/ckb-auth-cli cardano verify -p <Public key hash> -m $message --signature_file tests/cardano_lock/test_data/cardano_tx.signed.json
 ```
 
 ### Signature
