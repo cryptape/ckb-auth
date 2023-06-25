@@ -67,6 +67,9 @@ int ckb_auth(CkbEntryType *entry, CkbAuthType *id, const uint8_t *signature,
                     id->content, 20);
     } else if (entry->entry_category == EntryCategorySpawn) {
         char algorithm_id_str[2 + 1];
+        if (signature_size > 1024 * 8) {
+            return CKB_INVALID_DATA;
+        }
         char signature_str[signature_size * 2 + 1];
         char message_str[32 * 2 + 1];
         char pubkey_hash_str[20 * 2 + 1];
