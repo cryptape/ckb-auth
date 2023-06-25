@@ -29,8 +29,8 @@ impl FromStr for MoneroMode {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
             "spend" => Ok(MoneroMode::Spend),
-            "view" => Ok(MoneroMode::View),
-            _ => Err(anyhow!("Only spend and view mode are supported")),
+            "view" => Err(anyhow!("View mode is currently not supported, use spend instead")),
+            _ => Err(anyhow!("Only spend mode is supported")),
         }
     }
 }
@@ -44,7 +44,7 @@ impl BlockChainArgs for MoneroLockArgs {
     fn reg_parse_args(&self, cmd: Command) -> Command {
         cmd.arg(arg!(-a --address <ADDRESS> "The address to parse"))
             .arg(
-                arg!(-m --mode <MODE> "The mode to sign transactions (must be spend or view)")
+                arg!(-m --mode <MODE> "The mode to sign transactions (currently the only valid value is spend)")
                     .required(false),
             )
     }
@@ -54,7 +54,7 @@ impl BlockChainArgs for MoneroLockArgs {
     fn reg_verify_args(&self, cmd: Command) -> Command {
         cmd.arg(arg!(-a --address <ADDRESS> "The pubkey address whose hash verify against"))
             .arg(
-                arg!(-m --mode <MODE> "The mode to sign transactions (must be spend or view)")
+                arg!(-m --mode <MODE> "The mode to sign transactions (currently the only valid value is spend)")
                     .required(false),
             )
             .arg(arg!(-p --pubkeyhash <PUBKEYHASH> "The pubkey hash to include in the message"))

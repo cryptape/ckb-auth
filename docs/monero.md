@@ -13,7 +13,7 @@ See [the docs](./auth.md) for more details.
 
 ## Get the pub key hash with `parse` sub command.
 Here the argument given to `-a` is the address of monero account, while the argument given to `-m` refers to
-whether the spend key or view key is used to sign the transaction.
+whether the spend key or view key is used to sign the transaction (only spend key mode is supported).
 ```
 ckb-auth-cli monero parse -a 41eBLjYsK28CJD5z2b7FojMCDg6vERASShVZqAvnsC9LhS7saG8CmMo5Rm92wgnT8wa6nJVu57MHHjmnoyvTpCG7NQ7dErc -m spend
 ```
@@ -114,17 +114,18 @@ public: 007caf7a553a894389dd562115b17e78ba84a5c7692677f216c54385dc5c6ff1
 ```
 
 ## Getting the pubkey hash
-There is a flag `mode` for `monero-wallet-cli` to toggle whether to use spend key or view key to sign a message.
-The only valid values for `mode` are 0 and 1. 0 (default or set by passing parameter `--spend` to the rpc `sign`)
-represents that we used spend key to sign the message,
-while 1 (set by passing parameter `--view` to the rpc `sign`) represents that we used view key to sign the message.
-
 Currently, ckb-auth uses mode, spend public key, view public key to compute pubkey hash of monero account.
 To be more specific,
 
 ```
 pubkey_hash = blake2b_256(mode || pub_spend_key || pub_view_key)
 ```
+
+Here `mode` indicates whether we are using the spend key or the view key.
+Although there are flags `--spend` and `--view` for `monero-wallet-cli` to toggle whether to
+use spend key or view key to sign a message. We only support signing transactions with spend key.
+Thus he only valid values for `mode` is 0, which
+represents that we used spend key to sign the message.
 
 For example if the account we are using to sign messages is as above, i.e. it has
 public spend key `007caf7a553a894389dd562115b17e78ba84a5c7692677f216c54385dc5c6ff1` and
@@ -146,7 +147,6 @@ We can sign a message with spend key by running
 ```
 monero-wallet-cli --wallet-file ckb-auth-test-wallet --password pw sign message
 ```
-Signing with view key is also possible by passing `--view` to the sign command.
 
 Below is a sample output of the above command.
 
@@ -171,7 +171,8 @@ we get the base58 representation of the signature. Note that monero's implementa
 See [monero-rs/base58-monero](https://github.com/monero-rs/base58-monero) for how to manipulate monero base58 data programatically.
 
 In order for ckb-auth to acutally verify the vailidity of the signature, we need to store the signature,
-the mode that used to sign the transactions and public keys (spend key followed by view key).
+the mode (only spend key mode is supported) that used to sign the transactions
+and public keys (spend key followed by view key).
 For example, to verify the signature with base65 encoding `3ZKheximq145tW14dshL17Jpqp2GJn296GfRnGqt3pMeaZU7xoEEAFr2Xm7Jc7xZjYWf6KhstZanA73to7uF6rea`
 which is signed by the spend key of monero account `41eBLjYsK28CJD5z2b7FojMCDg6vERASShVZqAvnsC9LhS7saG8CmMo5Rm92wgnT8wa6nJVu57MHHjmnoyvTpCG7NQ7dErc`
 we need to use the data whose hex encoding is
