@@ -3,19 +3,17 @@ extern crate monero as monero_rs;
 use super::{utils::decode_string, BlockChain, BlockChainArgs};
 use anyhow::{anyhow, Error};
 use ckb_auth_rs::{
-    auth_builder, build_resolved_tx, debug_printer, gen_tx_with_pub_key_hash, get_message_to_sign,
-    set_signature, AlgorithmType, DummyDataLoader, EntryCategoryType, MoneroAuth, TestConfig,
-    MAX_CYCLES,
+    auth_builder, build_resolved_tx, debug_printer, gen_tx_scripts_verifier,
+    gen_tx_with_pub_key_hash, get_message_to_sign, set_signature, AlgorithmType, DummyDataLoader,
+    EntryCategoryType, MoneroAuth, TestConfig, MAX_CYCLES,
 };
 use ckb_script::TransactionScriptsVerifier;
+use ckb_types::bytes::{BufMut, BytesMut};
 use clap::{arg, ArgMatches, Command};
 use core::str::FromStr;
 use hex::encode;
 use monero_rs::Address;
 use std::sync::Arc;
-use ckb_types::{
-    bytes::{BufMut, BytesMut},
-};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum MoneroMode {
@@ -29,7 +27,9 @@ impl FromStr for MoneroMode {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_ascii_lowercase().as_str() {
             "spend" => Ok(MoneroMode::Spend),
-            "view" => Err(anyhow!("View mode is currently not supported, use spend instead")),
+            "view" => Err(anyhow!(
+                "View mode is currently not supported, use spend instead"
+            )),
             _ => Err(anyhow!("Only spend mode is supported")),
         }
     }
@@ -102,7 +102,7 @@ impl BlockChain for MoneroLock {
             .try_into()
             .unwrap();
 
-        let run_type = EntryCategoryType::Exec;
+        let run_type = EntryCategoryType::Spawn;
         // Note that we must set the official parameter of auth_builder to be true here.
         // The difference between official=true and official=false is that the later
         // convert the message to a form that can be signed directly with secp256k1.
@@ -157,7 +157,7 @@ impl BlockChain for MoneroLock {
         let signature = data.freeze();
 
         let algorithm_type = AlgorithmType::Monero;
-        let run_type = EntryCategoryType::Exec;
+        let run_type = EntryCategoryType::Spawn;
         let auth = auth_builder(algorithm_type, false).unwrap();
         let config = TestConfig::new(&auth, run_type, 1);
         let mut data_loader = DummyDataLoader::new();
@@ -166,8 +166,7 @@ impl BlockChain for MoneroLock {
         let tx = set_signature(tx, &signature);
         let resolved_tx = build_resolved_tx(&data_loader, &tx);
 
-        let mut verifier =
-            TransactionScriptsVerifier::new(Arc::new(resolved_tx), data_loader.clone());
+        let mut verifier = gen_tx_scripts_verifier(tx, data_loader);
         verifier.set_debug_printer(debug_printer);
         let result = verifier.verify(MAX_CYCLES);
         if result.is_err() {
