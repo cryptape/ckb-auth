@@ -6,12 +6,13 @@ use alloc::format;
 use ckb_std::{
     ckb_types::core::ScriptHashType,
     dynamic_loading_c_impl::{CKBDLContext, Library, Symbol},
-    high_level::exec_cell,
+    high_level::spawn_cell,
     syscalls::SysError,
 };
 use log::info;
 // use core::ffi::CStr;
 use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 use core::mem::size_of_val;
 use core::mem::transmute;
 use hex::encode;
@@ -82,17 +83,18 @@ pub struct CkbAuthType {
 }
 
 pub enum EntryCategoryType {
-    Exec = 0,
+    // Exec = 0,
     DynamicLinking = 1,
-    // Spawn = 2,
+    Spawn = 2,
 }
 
 impl TryFrom<u8> for EntryCategoryType {
     type Error = CkbAuthError;
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Self::Exec),
+            // 0 => Ok(Self::Exec),
             1 => Ok(Self::DynamicLinking),
+            2 => Ok(Self::Spawn),
             _ => Err(CkbAuthError::EncodeArgs),
         }
     }
@@ -111,32 +113,31 @@ pub fn ckb_auth(
     message: &[u8; 32],
 ) -> Result<(), CkbAuthError> {
     match entry.entry_category {
-        EntryCategoryType::Exec => ckb_auth_exec(entry, id, signature, message),
+        // EntryCategoryType::Exec => ckb_auth_exec(entry, id, signature, message),
         EntryCategoryType::DynamicLinking => ckb_auth_dl(entry, id, signature, message),
+        EntryCategoryType::Spawn => ckb_auth_spawn(entry, id, signature, message),
     }
 }
 
-fn ckb_auth_exec(
+fn ckb_auth_spawn(
     entry: &CkbEntryType,
     id: &CkbAuthType,
     signature: &[u8],
     message: &[u8; 32],
 ) -> Result<(), CkbAuthError> {
-    let args = CString::new(format!(
-        "{}:{:02X?}:{:02X?}:{}:{}:{}",
-        encode(&entry.code_hash),
-        entry.hash_type as u8,
-        id.algorithm_id.clone() as u8,
-        encode(signature),
-        encode(message),
-        encode(id.pubkey_hash)
-    ))?;
+    let algorithm_id_str = CString::new(format!("{:02X?}", id.algorithm_id.clone() as u8,))?;
+    let signature_str = CString::new(format!("{}", encode(signature)))?;
+    let message_str = CString::new(format!("{}", encode(message)))?;
+    let pubkey_hash_str = CString::new(format!("{}", encode(id.pubkey_hash)))?;
 
-    // args     id + pubhash + code_hash + hash_type + entry_category
-    // witness  sign
+    let args = [
+        algorithm_id_str.as_c_str(),
+        signature_str.as_c_str(),
+        message_str.as_c_str(),
+        pubkey_hash_str.as_c_str(),
+    ];
 
-    // info!("args: {:?}", args);
-    exec_cell(&entry.code_hash, entry.hash_type, 0, 0, &[args.as_c_str()])?;
+    spawn_cell(&entry.code_hash, entry.hash_type, &args, 8, &mut Vec::new())?;
     Ok(())
 }
 

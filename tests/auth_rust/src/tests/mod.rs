@@ -1,10 +1,12 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 
+use ckb_chain_spec::consensus::{Consensus, ConsensusBuilder};
 use ckb_crypto::secp::{Generator, Privkey, Pubkey};
-use ckb_script::TransactionScriptsVerifier;
 use ckb_types::{
     bytes::{BufMut, Bytes, BytesMut},
+    core::{hardfork::HardForks, EpochNumberWithFraction, HeaderView},
+    prelude::*,
     H256,
 };
 use log::{Level, LevelFilter, Metadata, Record};
@@ -14,19 +16,18 @@ use std::sync::Arc;
 
 use crate::{
     assert_script_error, auth_builder, build_resolved_tx, debug_printer, gen_args, gen_tx,
-    gen_tx_with_grouped_args, sign_tx, AlgorithmType, Auth, AuthErrorCodeType, BitcoinAuth,
-    CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader, EntryCategoryType, EosAuth,
-    EthereumAuth, LitecoinAuth, SchnorrAuth, TestConfig, TronAuth, MAX_CYCLES,
+    gen_tx_scripts_verifier, gen_tx_with_grouped_args, sign_tx, AlgorithmType, Auth,
+    AuthErrorCodeType, BitcoinAuth, CKbAuth, CkbMultisigAuth, DogecoinAuth, DummyDataLoader,
+    EntryCategoryType, EosAuth, EthereumAuth, LitecoinAuth, SchnorrAuth, TestConfig, TronAuth,
+    MAX_CYCLES,
 };
 
 fn verify_unit(config: &TestConfig) -> Result<u64, ckb_error::Error> {
     let mut data_loader = DummyDataLoader::new();
     let tx = gen_tx(&mut data_loader, &config);
     let tx = sign_tx(tx, &config);
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
 
-    let mut verifier = TransactionScriptsVerifier::new(Arc::new(resolved_tx), data_loader.clone());
-    verifier.set_debug_printer(debug_printer);
+    let verifier = gen_tx_scripts_verifier(tx, data_loader);
     verifier.verify(MAX_CYCLES)
 }
 
@@ -86,11 +87,8 @@ fn unit_test_multiple_group(auth: &Box<dyn Auth>, run_type: EntryCategoryType) {
         &mut rng,
     );
 
-    let tx = sign_tx(tx, &config);
-    let resolved_tx = build_resolved_tx(&data_loader, &tx);
-
-    let mut verifier = TransactionScriptsVerifier::new(Arc::new(resolved_tx), data_loader.clone());
-    verifier.set_debug_printer(debug_printer);
+    let _tx = sign_tx(tx, &config);
+    // let _verifier = gen_tx_scripts_verifier(tx, data_loader);
 
     assert_result_ok(verify_unit(&config), "multiple group");
 }
@@ -171,13 +169,13 @@ fn unit_test_common_with_runtype(
 }
 
 fn unit_test_common(algorithm_type: AlgorithmType) {
-    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Exec] {
+    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Spawn] {
         unit_test_common_with_runtype(algorithm_type, t, false);
     }
 }
 
 fn unit_test_common_official(algorithm_type: AlgorithmType) {
-    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Exec] {
+    for t in [EntryCategoryType::DynamicLinking, EntryCategoryType::Spawn] {
         unit_test_common_with_runtype(algorithm_type, t, true);
     }
 }
@@ -213,7 +211,7 @@ fn bitcoin_uncompress_verify() {
     auth.compress = false;
     let auth: Box<dyn Auth> = auth;
     unit_test_common_with_auth(&auth, EntryCategoryType::DynamicLinking);
-    unit_test_common_with_auth(&auth, EntryCategoryType::Exec);
+    unit_test_common_with_auth(&auth, EntryCategoryType::Spawn);
 }
 
 #[test]
@@ -666,7 +664,7 @@ fn unit_test_ckbmultisig(auth: &Box<dyn Auth>, run_type: EntryCategoryType) {
 fn ckbmultisig_verify() {
     let auth: Box<dyn Auth> = CkbMultisigAuth::new(2, 2, 1);
     unit_test_ckbmultisig(&auth, EntryCategoryType::DynamicLinking);
-    unit_test_ckbmultisig(&auth, EntryCategoryType::Exec);
+    unit_test_ckbmultisig(&auth, EntryCategoryType::Spawn);
 }
 
 #[test]
@@ -703,7 +701,7 @@ fn abnormal_algorithm_type() {
         );
     }
     {
-        let config = TestConfig::new(&auth, EntryCategoryType::Exec, 1);
+        let config = TestConfig::new(&auth, EntryCategoryType::Spawn, 1);
         assert_result_error(
             verify_unit(&config),
             "sign size(smaller)",

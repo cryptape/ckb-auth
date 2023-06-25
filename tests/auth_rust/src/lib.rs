@@ -1,6 +1,8 @@
+use ckb_chain_spec::consensus::ConsensusBuilder;
 use ckb_crypto::secp::{Generator, Privkey};
 use ckb_error::Error;
-use ckb_traits::{CellDataProvider, HeaderProvider};
+use ckb_script::{TransactionScriptsVerifier, TxVerifyEnv};
+use ckb_traits::{CellDataProvider, ExtensionProvider, HeaderProvider};
 use ckb_types::{
     bytes::{BufMut, Bytes, BytesMut},
     core::{
@@ -24,7 +26,10 @@ use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 use std::{collections::HashMap, mem::size_of, result, vec};
 
-use std::process::{Child, Command};
+use std::{
+    process::{Child, Command},
+    sync::Arc,
+};
 use tempdir::TempDir;
 
 mod tests;
@@ -117,6 +122,12 @@ impl CellDataProvider for DummyDataLoader {
 
 impl HeaderProvider for DummyDataLoader {
     fn get_header(&self, _hash: &Byte32) -> Option<HeaderView> {
+        None
+    }
+}
+
+impl ExtensionProvider for DummyDataLoader {
+    fn get_block_extension(&self, _hash: &packed::Byte32) -> Option<packed::Bytes> {
         None
     }
 }
@@ -430,7 +441,7 @@ pub fn gen_tx_with_grouped_args<R: Rng>(
             let script = Script::new_builder()
                 .args(args.pack())
                 .code_hash(sighash_all_cell_data_hash.clone())
-                .hash_type(ScriptHashType::Data1.into())
+                .hash_type(ScriptHashType::Data2.into())
                 .build();
             let previous_output_cell = CellOutput::new_builder()
                 .capacity(dummy_capacity.pack())
@@ -470,8 +481,9 @@ struct EntryType {
 
 #[derive(Clone, Copy)]
 pub enum EntryCategoryType {
-    Exec = 0,
+    // Exec = 0,
     DynamicLinking = 1,
+    Spawn = 2,
 }
 
 #[derive(PartialEq, Eq)]
@@ -528,7 +540,7 @@ pub fn do_gen_args(config: &TestConfig, pub_key_hash: Option<Vec<u8>>) -> Bytes 
 
     let mut entry_type = EntryType {
         code_hash: [0; 32],
-        hash_type: ScriptHashType::Data1.into(),
+        hash_type: ScriptHashType::Data2.into(),
         entry_category: config.entry_category_type.clone() as u8,
     };
 
@@ -604,7 +616,7 @@ pub fn debug_printer(_script: &Byte32, msg: &str) {
     );
     println!("{:?}: {}", str, msg);
     */
-    print!("{}", msg);
+    println!("{}", msg);
 }
 
 pub struct MyLogger;
@@ -1370,7 +1382,6 @@ impl RSAAuth {
 
         use mbedtls::pk::Pk;
         use mbedtls::rng::ctr_drbg::CtrDrbg;
-        use std::sync::Arc;
 
         let mut rng =
             CtrDrbg::new(Arc::new(mbedtls::rng::OsEntropy::new()), None).expect("new ctrdrbg rng");
@@ -1438,7 +1449,6 @@ impl RSAAuth {
         use mbedtls::hash::Type::Sha256;
         use mbedtls::pk::{Options, Pk, RsaPadding};
         use mbedtls::rng::ctr_drbg::CtrDrbg;
-        use std::sync::Arc;
 
         let mut priv_key = Pk::from_private_key(privkey, None).expect("import rsa private key");
         priv_key.set_options(Options::Rsa {
@@ -1508,4 +1518,21 @@ impl Auth for OwnerLockAuth {
     fn sign(&self, _msg: &H256) -> Bytes {
         Bytes::from([0; 64].to_vec())
     }
+}
+
+pub fn gen_tx_scripts_verifier(
+    tx: TransactionView,
+    data_loader: DummyDataLoader,
+) -> TransactionScriptsVerifier<DummyDataLoader> {
+    let resolved_tx = build_resolved_tx(&data_loader, &tx);
+    let mut verifier = TransactionScriptsVerifier::new(
+        Arc::new(resolved_tx),
+        data_loader.clone(),
+        Arc::new(ConsensusBuilder::default().build()),
+        Arc::new(TxVerifyEnv::new_commit(
+            &HeaderView::new_advanced_builder().build(),
+        )),
+    );
+    verifier.set_debug_printer(debug_printer);
+    verifier
 }
