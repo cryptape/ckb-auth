@@ -90,6 +90,6 @@ fn main() -> Result<(), Error> {
         Some(("parse", operate_mathches)) => subcommand.parse(operate_mathches),
         Some(("generate", operate_mathches)) => subcommand.generate(operate_mathches),
         Some(("verify", operate_mathches)) => subcommand.verify(operate_mathches),
-        _ => return Err(anyhow!("unsupported operate")),
+        _ => Err(anyhow!("unsupported operate")),
     }
 }

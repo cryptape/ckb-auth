@@ -7,14 +7,14 @@ use ckb_auth_rs::{
     gen_tx_with_pub_key_hash, get_message_to_sign, set_signature, AlgorithmType, DummyDataLoader,
     EntryCategoryType, MoneroAuth, TestConfig, MAX_CYCLES,
 };
-use ckb_script::TransactionScriptsVerifier;
+
 use ckb_types::bytes::{BufMut, BytesMut};
 use clap::{arg, ArgMatches, Command};
 use core::str::FromStr;
 use hex::encode;
 use monero_rs::Address;
-use std::sync::Arc;
 
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum MoneroMode {
     Spend,
@@ -162,9 +162,9 @@ impl BlockChain for MoneroLock {
         let config = TestConfig::new(&auth, run_type, 1);
         let mut data_loader = DummyDataLoader::new();
         let tx = gen_tx_with_pub_key_hash(&mut data_loader, &config, pubkey_hash.to_vec());
-        let signature = signature.into();
+        let signature = signature;
         let tx = set_signature(tx, &signature);
-        let resolved_tx = build_resolved_tx(&data_loader, &tx);
+        let _resolved_tx = build_resolved_tx(&data_loader, &tx);
 
         let mut verifier = gen_tx_scripts_verifier(tx, data_loader);
         verifier.set_debug_printer(debug_printer);
