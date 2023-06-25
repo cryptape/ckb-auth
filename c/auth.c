@@ -487,7 +487,7 @@ int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
                             msg_len);
 
     int suc = ed25519_verify_monero(sig, hash, sizeof(hash), pubkey);
-    CHECK2(suc == 1, ERROR_EXEC_INVALID_SIG);
+    CHECK2(suc == 1, ERROR_SPAWN_INVALID_SIG);
 
     blake2b_state ctx;
     uint8_t pubkey_hash[BLAKE2B_BLOCK_SIZE] = {0};
