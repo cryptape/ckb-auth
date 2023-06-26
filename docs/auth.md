@@ -129,9 +129,17 @@ Key parameters:
 - pubkey: 32 compressed pubkey
 - pubkey hash: blake160 of pubkey
 
+#### Monero(algorithm_id=12)
+
+Key parameters:
+- signature: monero signature
+- mode: 1 byte hardcoded to 00 to indicate we are using spend key to sign transactions
+- spend key: 32 bytes of the public spend key
+- view key: 32 bytes of the public view key
+- pubkey hash: blake160 of (mode || spend key || view key)
+
 #### More blockchains Support Are Ongoing ...
 - Ripple
-- Monero
 - Solana
 
 ...

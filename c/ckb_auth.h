@@ -36,6 +36,7 @@ enum AuthAlgorithmIdType {
     AuthAlgorithmIdIso97962 = 9,
     AuthAlgorithmIdLitecoin = 10,
     AuthAlgorithmIdCardano = 11,
+    AuthAlgorithmIdMonero = 12,
     AuthAlgorithmIdOwnerLock = 0xFC,
 };
 

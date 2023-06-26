@@ -1,7 +1,10 @@
 mod auth_script;
 mod cardano;
 mod litecoin;
+mod monero;
+mod utils;
 
+use crate::monero::MoneroLockArgs;
 use cardano::CardanoLockArgs;
 use litecoin::LitecoinLockArgs;
 
@@ -70,6 +73,7 @@ fn main() -> Result<(), Error> {
     let block_chain_args = [
         Box::new(LitecoinLockArgs {}) as Box<dyn BlockChainArgs>,
         Box::new(CardanoLockArgs {}) as Box<dyn BlockChainArgs>,
+        Box::new(MoneroLockArgs {}) as Box<dyn BlockChainArgs>,
     ];
 
     let matches = cli(block_chain_args.as_slice()).get_matches();
@@ -86,6 +90,6 @@ fn main() -> Result<(), Error> {
         Some(("parse", operate_mathches)) => subcommand.parse(operate_mathches),
         Some(("generate", operate_mathches)) => subcommand.generate(operate_mathches),
         Some(("verify", operate_mathches)) => subcommand.verify(operate_mathches),
-        _ => return Err(anyhow!("unsupported operate")),
+        _ => Err(anyhow!("unsupported operate")),
     }
 }

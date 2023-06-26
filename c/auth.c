@@ -3,6 +3,8 @@
 #include "mbedtls/md_internal.h"
 #include "mbedtls/memory_buffer_alloc.h"
 #include "ed25519.h"
+#include "ge.h"
+#include "sc.h"
 
 // configuration for secp256k1
 #define ENABLE_MODULE_EXTRAKEYS
@@ -63,6 +65,10 @@
 #define RIPEMD160_SIZE 20
 #define SCHNORR_SIGNATURE_SIZE (32 + 64)
 #define SCHNORR_PUBKEY_SIZE 32
+#define MONERO_PUBKEY_SIZE 32
+#define MONERO_SIGNATURE_SIZE 64
+#define MONERO_DATA_SIZE (MONERO_SIGNATURE_SIZE + 1 + MONERO_PUBKEY_SIZE * 2)
+#define MONERO_KECCAK_SIZE 32
 
 enum AuthErrorCodeType {
     ERROR_NOT_IMPLEMENTED = 100,
@@ -356,6 +362,138 @@ int validate_signature_cardano(void *prefilled_data, const uint8_t *sig,
     blake2b_init(&ctx, BLAKE2B_BLOCK_SIZE);
     blake2b_update(&ctx, cardano_data.public_key,
                    sizeof(cardano_data.public_key));
+    blake2b_final(&ctx, pubkey_hash, sizeof(pubkey_hash));
+
+    memcpy(output, pubkey_hash, BLAKE160_SIZE);
+    *output_len = BLAKE160_SIZE;
+exit:
+    return err;
+}
+
+// Write size_t integer as a varint to the dest.
+// See
+// https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/common/varint.h#L64-L79
+size_t write_varint(uint8_t *dest, size_t n) {
+    uint8_t *ptr = dest;
+    /* Make sure that there is one after this */
+    while (n >= 0x80) {
+        *ptr = ((uint8_t)(n)&0x7f) | 0x80;
+        ptr++;
+        n >>= 7; /* I should be in multiples of 7, this should just get the next
+                    part */
+    }
+    /* writes the last one to dest */
+    *ptr = (uint8_t)(n);
+    ptr++;
+    return ptr - dest;
+}
+
+// Get monero hash digest from message.
+// See
+// https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/wallet/wallet2.cpp#L12519-L12538
+void get_monero_message_hash(uint8_t hash[MONERO_KECCAK_SIZE],
+                             uint8_t *spend_pubkey, uint8_t *view_pubkey,
+                             uint8_t mode, const uint8_t *msg, size_t msg_len) {
+    const char MONERO_HASH_KEY_MESSAGE_SIGNING[] = "MoneroMessageSignature";
+    SHA3_CTX ctx;
+    keccak_init(&ctx);
+
+    keccak_update(&ctx, (uint8_t *)MONERO_HASH_KEY_MESSAGE_SIGNING,
+                  sizeof(MONERO_HASH_KEY_MESSAGE_SIGNING));  // includes NUL
+    keccak_update(&ctx, spend_pubkey, MONERO_PUBKEY_SIZE);
+    keccak_update(&ctx, view_pubkey, MONERO_PUBKEY_SIZE);
+    keccak_update(&ctx, &mode, sizeof(mode));
+
+    uint8_t len_buf[(sizeof(size_t) * 8 + 6) / 7];
+    size_t written_bytes = write_varint((uint8_t *)len_buf, msg_len);
+    keccak_update(&ctx, (uint8_t *)len_buf, written_bytes);
+
+    keccak_update(&ctx, (uint8_t *)msg, msg_len);
+
+    keccak_final(&ctx, (uint8_t *)hash);
+}
+
+void monero_hash_to_scalar(uint8_t *msg, size_t msg_len, uint8_t *key,
+                           uint8_t *comm, uint8_t scalar[32]) {
+    uint8_t state[200];
+    SHA3_CTX sha3_ctx;
+
+    keccak_init(&sha3_ctx);
+    keccak_update(&sha3_ctx, msg, msg_len);
+    keccak_update(&sha3_ctx, key, 32);
+    keccak_update(&sha3_ctx, comm, 32);
+    keccak_final(&sha3_ctx, state);
+    memcpy(scalar, &state, 32);
+    sc_reduce32(scalar);
+}
+
+// See
+// https://github.com/monero-project/monero/blob/e06129bb4d1076f4f2cebabddcee09f1e9e30dcc/src/crypto/crypto.cpp#L319-L341
+int ed25519_verify_monero(const unsigned char *signature,
+                          const unsigned char *message, size_t message_len,
+                          const unsigned char *public_key) {
+    ge_p2 tmp2;
+    ge_p3 tmp3;
+    uint8_t c[32];
+    uint8_t comm[32];
+    uint8_t *sig_c = (uint8_t *)signature;
+    uint8_t *sig_r = sig_c + 32;
+    uint8_t zero[32];
+    uint8_t sig_c_neg[32];
+
+    if (sc_check(sig_c) != 0 || sc_check(sig_r) != 0 || !sc_isnonzero(sig_c)) {
+        return 0;
+    }
+    // TODO: implement ge_frombytes_vartime instead of using
+    // ge_frombytes_negate_vartime and then multiple the result with a negative
+    // scalar
+    sc_0(zero);
+    sc_sub(sig_c_neg, zero, sig_c);
+    if (ge_frombytes_negate_vartime(&tmp3, public_key) != 0) {
+        return 0;
+    }
+    ge_double_scalarmult_vartime(&tmp2, sig_c_neg, &tmp3, sig_r);
+    ge_tobytes(comm, &tmp2);
+
+    static const uint8_t infinity[32] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                         0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    if (memcmp(&comm, &infinity, 32) == 0) return 0;
+    monero_hash_to_scalar((uint8_t *)message, message_len,
+                          (uint8_t *)public_key, comm, c);
+    sc_sub(c, c, sig_c);
+    return sc_isnonzero((const uint8_t *)c) == 0;
+}
+
+int validate_signature_monero(void *prefilled_data, const uint8_t *sig,
+                              size_t sig_len, const uint8_t *msg,
+                              size_t msg_len, uint8_t *output,
+                              size_t *output_len) {
+    int err = 0;
+
+    CHECK2(msg_len == BLAKE2B_BLOCK_SIZE, ERROR_INVALID_ARG);
+    CHECK2(sig_len == MONERO_DATA_SIZE, ERROR_INVALID_ARG);
+
+    uint8_t *mode_ptr = (uint8_t *)sig + MONERO_SIGNATURE_SIZE;
+    // We only support using spend key to sign transactions.
+    CHECK2(*mode_ptr == 0, ERROR_INVALID_ARG);
+
+    uint8_t *spend_pubkey = mode_ptr + sizeof(*mode_ptr);
+    uint8_t *view_pubkey = spend_pubkey + MONERO_PUBKEY_SIZE;
+    uint8_t *pubkey = spend_pubkey;
+
+    uint8_t hash[MONERO_KECCAK_SIZE];
+    get_monero_message_hash(hash, spend_pubkey, view_pubkey, *mode_ptr, msg,
+                            msg_len);
+
+    int suc = ed25519_verify_monero(sig, hash, sizeof(hash), pubkey);
+    CHECK2(suc == 1, ERROR_SPAWN_INVALID_SIG);
+
+    blake2b_state ctx;
+    uint8_t pubkey_hash[BLAKE2B_BLOCK_SIZE] = {0};
+    blake2b_init(&ctx, BLAKE2B_BLOCK_SIZE);
+    // TODO: find out the official way of get monero pubkey
+    blake2b_update(&ctx, mode_ptr, 1 + MONERO_PUBKEY_SIZE * 2);
     blake2b_final(&ctx, pubkey_hash, sizeof(pubkey_hash));
 
     memcpy(output, pubkey_hash, BLAKE160_SIZE);
@@ -765,6 +903,10 @@ __attribute__((visibility("default"))) int ckb_auth_validate(
         err = verify(pubkey_hash, signature, signature_size, message,
                      message_size, validate_signature_cardano, convert_copy);
         CHECK(err);
+    } else if (auth_algorithm_id == AuthAlgorithmIdMonero) {
+        err = verify(pubkey_hash, signature, signature_size, message,
+                     message_size, validate_signature_monero, convert_copy);
+        CHECK(err);
     } else if (auth_algorithm_id == AuthAlgorithmIdOwnerLock) {
         CHECK2(is_lock_script_hash_present(pubkey_hash), ERROR_MISMATCHED);
         err = 0;
@@ -900,3 +1042,7 @@ exit:
 #undef ARGV_MESSAGE
 #undef ARGV_PUBKEY_HASH
 }
+
+
+
+

@@ -127,7 +127,7 @@ fn get_pubkey_hash_by_args(sub_matches: &ArgMatches) -> Result<[u8; 20], Error> 
 fn get_pub_key_hash_from_address(address: &str) -> Result<Vec<u8>, Error> {
     // base58 -d <<< mhknqLHQGWDXuLsPdzab8nA4jD3fMdVYS2 | xxd -s 1 -l 20 -p
     let bytes = bs58::decode(&address).into_vec()?;
-    return Ok(bytes[1..21].into());
+    Ok(bytes[1..21].into())
 }
 
 fn decode_string(s: &str, encoding: &str) -> Result<Vec<u8>, Error> {
